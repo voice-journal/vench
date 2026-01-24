@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # [Backend] FastAPI
+  backend:
+    build: .
+    container_name: vench-backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+      - ./data/audio:/app/data/audio
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=mysql+pymysql://user:password@db:3306/vench
+    depends_on:
+      - db
+    labels:
+      logging: "promtail"
+      logging_jobname: "fastapi_logs"
+
+  # [Frontend] Streamlit
+  frontend:
+    build: .
+    container_name: vench-frontend
+    command: streamlit run app/frontend.py --server.port 8501 --server.address 0.0.0.0
+    volumes:
+      - .:/app
+    ports:
+      - "8501:8501"
+    environment:
+      - BACKEND_URL=http://backend:8000
+
+  # [Database] MySQL
+  db:
+    image: mysql:8.0
+    container_name: vench-db
+    platform: linux/amd64
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: vench
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  # [Monitoring] Prometheus + Loki + Promtail + Grafana
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: vench-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  loki:
+    image: grafana/loki:latest
+    container_name: vench-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: vench-promtail
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers
+      - ./promtail-config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: vench-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+      - loki

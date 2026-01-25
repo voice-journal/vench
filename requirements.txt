@@ -13,3 +13,5 @@ pandas
 transformers
 torch
 python-dotenv
+sentencepiece
+pandas

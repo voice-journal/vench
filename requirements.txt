@@ -12,3 +12,5 @@ prometheus-fastapi-instrumentator
 pandas
 transformers
 torch
+sentencepiece
+pandas

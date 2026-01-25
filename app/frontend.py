@@ -1,6 +1,10 @@
-import streamlit as st
-import requests
 import os
+
+import requests
+import streamlit as st
+from dotenv import load_dotenv
+
+load_dotenv()
 
 st.set_page_config(page_title="Vench", page_icon="🛋️")
 BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8000")

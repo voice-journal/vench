@@ -10,3 +10,5 @@ streamlit
 faster-whisper
 prometheus-fastapi-instrumentator
 pandas
+transformers
+torch

@@ -74,3 +74,19 @@ async def create_diary(bg_tasks: BackgroundTasks, file: UploadFile = File(...), 
     bg_tasks.add_task(process_audio_task, new_diary.id)
 
     return {"message": "Accepted", "id": new_diary.id}
+
+@app.get("/diaries/{diary_id}")
+def get_diary(diary_id: int, db: Session = Depends(get_db)):
+    diary = db.query(Diary).filter(Diary.id == diary_id).first()
+    if not diary:
+        # 일기가 없으면 404 에러 반환
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Diary not found")
+
+    return {
+        "id": diary.id,
+        "status": diary.status,
+        "transcript": diary.transcript,
+        "emotion_label": diary.emotion_label,
+        "emotion_score": diary.emotion_score
+    }

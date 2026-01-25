@@ -5,7 +5,7 @@ from app.database import engine, Base, get_db, SessionLocal
 from app.models import Diary
 import shutil, os, uuid, logging
 from app.services.emotion_service import analyze_emotion
-
+from sqlalchemy import func
 # DB 초기화 (테이블 생성)
 Base.metadata.create_all(bind=engine)
 
@@ -90,3 +90,18 @@ def get_diary(diary_id: int, db: Session = Depends(get_db)):
         "emotion_label": diary.emotion_label,
         "emotion_score": diary.emotion_score
     }
+@app.get("/reports/weekly")
+def get_weekly_report(db: Session = Depends(get_db)):
+    """
+    저장된 모든 일기의 감정 분포를 집계하여 반환합니다.
+    (해커톤 시연용으로 날짜 필터 없이 전체 데이터를 분석합니다)
+    """
+    # SQL: SELECT emotion_label, COUNT(*) FROM diaries GROUP BY emotion_label
+    stats = db.query(Diary.emotion_label, func.count(Diary.id)) \
+        .filter(Diary.status == "COMPLETED") \
+        .group_by(Diary.emotion_label).all()
+
+    # 결과 변환: [('기쁨', 3), ('슬픔', 1)] -> {'기쁨': 3, '슬픔': 1}
+    report_data = {label: count for label, count in stats if label}
+
+    return report_data

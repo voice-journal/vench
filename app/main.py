@@ -1,10 +1,16 @@
-from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Depends
+import logging
+import os
+import shutil
+import uuid
+
+from fastapi import BackgroundTasks, Depends, FastAPI, File, UploadFile
 from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy.orm import Session
-from app.database import engine, Base, get_db, SessionLocal
+
+from app.database import Base, SessionLocal, engine, get_db
 from app.models import Diary
-import shutil, os, uuid, logging
 from app.services.emotion_service import analyze_emotion
+from app.services.stt_service import transcribe
 
 # DB 초기화 (테이블 생성)
 Base.metadata.create_all(bind=engine)
@@ -18,6 +24,7 @@ Instrumentator().instrument(app).expose(app)
 UPLOAD_DIR = "data/audio"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
 # 비동기 작업: 실제 AI 분석 로직
 def process_audio_task(diary_id: int):
     db = SessionLocal()
@@ -25,18 +32,22 @@ def process_audio_task(diary_id: int):
     try:
         diary = db.query(Diary).filter(Diary.id == diary_id).first()
         if diary:
-            # 1. STT (아직 STT는 없으니 가짜 텍스트 사용)
-            # 나중에 여기에 stt_service(diary.audio_path) 결과를 넣을 예정
-            fake_transcript = "오늘 팀원들이랑 서버 에러 잡느라 고생했지만 해결해서 너무 뿌듯하다."
-            diary.transcript = fake_transcript
+            # 1. STT
+            transcript = transcribe(diary.audio_path)
+            if not transcript:
+                diary.status = "FAILED"
+                db.commit()
+                return
+
+            diary.transcript = transcript
 
             # 2. 감정 분석 (User님이 만든 AI!) 🔥
             logger.info("🤖 AI 감정 분석 시작...")
             emotion_result = analyze_emotion(diary.transcript)
 
             # 3. 결과 DB 저장
-            diary.emotion_label = emotion_result['label']
-            diary.emotion_score = emotion_result['all_scores'] # 전체 점수(JSON) 저장
+            diary.emotion_label = emotion_result["label"]
+            diary.emotion_score = emotion_result["all_scores"]  # 전체 점수(JSON) 저장
             diary.status = "COMPLETED"
 
             db.commit()
@@ -51,12 +62,17 @@ def process_audio_task(diary_id: int):
                 diary_error.status = "FAILED"
                 db.commit()
         except:
-            pass # DB 연결 에러면 어쩔 수 없음
+            pass  # DB 연결 에러면 어쩔 수 없음
     finally:
         db.close()
 
+
 @app.post("/diaries")
-async def create_diary(bg_tasks: BackgroundTasks, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def create_diary(
+    bg_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
     # 1. 파일 저장
     file_uuid = str(uuid.uuid4())
     save_path = f"{UPLOAD_DIR}/{file_uuid}_{file.filename}"

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import engine, Base, get_db, SessionLocal
 from app.models import Diary
 import shutil, os, uuid, logging
+from app.services.emotion_service import analyze_emotion
 
 # DB 초기화 (테이블 생성)
 Base.metadata.create_all(bind=engine)
@@ -17,20 +18,40 @@ Instrumentator().instrument(app).expose(app)
 UPLOAD_DIR = "data/audio"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# 비동기 작업 (나중에 팀원들이 로직을 채울 곳)
+# 비동기 작업: 실제 AI 분석 로직
 def process_audio_task(diary_id: int):
     db = SessionLocal()
     logger.info(f"Task Start: diary_id={diary_id}")
     try:
-        # TODO: 여기서 STT, NLP 함수를 호출하게 됩니다.
-        # 지금은 임시로 '성공' 처리만 해둡니다.
         diary = db.query(Diary).filter(Diary.id == diary_id).first()
         if diary:
+            # 1. STT (아직 STT는 없으니 가짜 텍스트 사용)
+            # 나중에 여기에 stt_service(diary.audio_path) 결과를 넣을 예정
+            fake_transcript = "오늘 팀원들이랑 서버 에러 잡느라 고생했지만 해결해서 너무 뿌듯하다."
+            diary.transcript = fake_transcript
+
+            # 2. 감정 분석 (User님이 만든 AI!) 🔥
+            logger.info("🤖 AI 감정 분석 시작...")
+            emotion_result = analyze_emotion(diary.transcript)
+
+            # 3. 결과 DB 저장
+            diary.emotion_label = emotion_result['label']
+            diary.emotion_score = emotion_result['all_scores'] # 전체 점수(JSON) 저장
             diary.status = "COMPLETED"
-            diary.transcript = "아직 AI 모듈 연결 전입니다."
+
             db.commit()
+            logger.info(f"✅ 분석 완료: {diary.emotion_label}")
+
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error(f"Error processing diary {diary_id}: {e}")
+        # 에러 발생 시 DB에 '실패' 상태로 기록
+        try:
+            diary_error = db.query(Diary).filter(Diary.id == diary_id).first()
+            if diary_error:
+                diary_error.status = "FAILED"
+                db.commit()
+        except:
+            pass # DB 연결 에러면 어쩔 수 없음
     finally:
         db.close()
 

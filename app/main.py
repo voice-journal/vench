@@ -1,11 +1,18 @@
-from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Depends
+import logging
+import os
+import shutil
+import uuid
+
+from fastapi import BackgroundTasks, Depends, FastAPI, File, UploadFile
 from prometheus_fastapi_instrumentator import Instrumentator
-from sqlalchemy.orm import Session
-from app.database import engine, Base, get_db, SessionLocal
-from app.models import Diary
-import shutil, os, uuid, logging
-from app.services.emotion_service import analyze_emotion
 from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.database import Base, SessionLocal, engine, get_db
+from app.models import Diary
+from app.services.emotion_service import analyze_emotion
+from app.services.stt_service import transcribe
+
 # DB 초기화 (테이블 생성)
 Base.metadata.create_all(bind=engine)
 
@@ -18,6 +25,7 @@ Instrumentator().instrument(app).expose(app)
 UPLOAD_DIR = "data/audio"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
 # 비동기 작업: 실제 AI 분석 로직
 def process_audio_task(diary_id: int):
     db = SessionLocal()
@@ -25,18 +33,22 @@ def process_audio_task(diary_id: int):
     try:
         diary = db.query(Diary).filter(Diary.id == diary_id).first()
         if diary:
-            # 1. STT (아직 STT는 없으니 가짜 텍스트 사용)
-            # 나중에 여기에 stt_service(diary.audio_path) 결과를 넣을 예정
-            fake_transcript = "오늘 팀원들이랑 서버 에러 잡느라 고생했지만 해결해서 너무 뿌듯하다."
-            diary.transcript = fake_transcript
+            # 1. STT
+            transcript = transcribe(diary.audio_path)
+            if not transcript:
+                diary.status = "FAILED"
+                db.commit()
+                return
+
+            diary.transcript = transcript
 
             # 2. 감정 분석 (User님이 만든 AI!) 🔥
             logger.info("🤖 AI 감정 분석 시작...")
             emotion_result = analyze_emotion(diary.transcript)
 
             # 3. 결과 DB 저장
-            diary.emotion_label = emotion_result['label']
-            diary.emotion_score = emotion_result['all_scores'] # 전체 점수(JSON) 저장
+            diary.emotion_label = emotion_result["label"]
+            diary.emotion_score = emotion_result["all_scores"]  # 전체 점수(JSON) 저장
             diary.status = "COMPLETED"
 
             db.commit()
@@ -51,12 +63,17 @@ def process_audio_task(diary_id: int):
                 diary_error.status = "FAILED"
                 db.commit()
         except:
-            pass # DB 연결 에러면 어쩔 수 없음
+            pass  # DB 연결 에러면 어쩔 수 없음
     finally:
         db.close()
 
+
 @app.post("/diaries")
-async def create_diary(bg_tasks: BackgroundTasks, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def create_diary(
+    bg_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
     # 1. 파일 저장
     file_uuid = str(uuid.uuid4())
     save_path = f"{UPLOAD_DIR}/{file_uuid}_{file.filename}"
@@ -75,12 +92,14 @@ async def create_diary(bg_tasks: BackgroundTasks, file: UploadFile = File(...), 
 
     return {"message": "Accepted", "id": new_diary.id}
 
+
 @app.get("/diaries/{diary_id}")
 def get_diary(diary_id: int, db: Session = Depends(get_db)):
     diary = db.query(Diary).filter(Diary.id == diary_id).first()
     if not diary:
         # 일기가 없으면 404 에러 반환
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="Diary not found")
 
     return {
@@ -88,8 +107,10 @@ def get_diary(diary_id: int, db: Session = Depends(get_db)):
         "status": diary.status,
         "transcript": diary.transcript,
         "emotion_label": diary.emotion_label,
-        "emotion_score": diary.emotion_score
+        "emotion_score": diary.emotion_score,
     }
+
+
 @app.get("/reports/weekly")
 def get_weekly_report(db: Session = Depends(get_db)):
     """
@@ -97,9 +118,12 @@ def get_weekly_report(db: Session = Depends(get_db)):
     (해커톤 시연용으로 날짜 필터 없이 전체 데이터를 분석합니다)
     """
     # SQL: SELECT emotion_label, COUNT(*) FROM diaries GROUP BY emotion_label
-    stats = db.query(Diary.emotion_label, func.count(Diary.id)) \
-        .filter(Diary.status == "COMPLETED") \
-        .group_by(Diary.emotion_label).all()
+    stats = (
+        db.query(Diary.emotion_label, func.count(Diary.id))
+        .filter(Diary.status == "COMPLETED")
+        .group_by(Diary.emotion_label)
+        .all()
+    )
 
     # 결과 변환: [('기쁨', 3), ('슬픔', 1)] -> {'기쁨': 3, '슬픔': 1}
     report_data = {label: count for label, count in stats if label}

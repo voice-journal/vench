@@ -12,5 +12,6 @@ prometheus-fastapi-instrumentator
 pandas
 transformers
 torch
+python-dotenv
 sentencepiece
 pandas

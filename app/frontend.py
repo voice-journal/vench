@@ -1,13 +1,15 @@
-import streamlit as st
-import requests
 import time
-import pandas as pd
+
 import altair as alt
+import pandas as pd
+import requests
+import streamlit as st
 
 # 백엔드 주소
 BACKEND_URL = "http://backend:8000"
 
-st.set_page_config(page_title="Vench", page_icon="🛋️", layout="wide")
+st.set_page_config(page_title="Vench", page_icon="🛋️", layout="wide")  # 넓은 화면 사용
+
 
 # 가독성을 위해 차트 레이블을 가로로 고정하는 헬퍼 함수
 def render_styled_chart(df, color):
@@ -16,13 +18,21 @@ def render_styled_chart(df, color):
     x_col = chart_data.columns[0]
     y_col = chart_data.columns[1]
 
-    chart = alt.Chart(chart_data).mark_bar(color=color).encode(
-        x=alt.X(f'{x_col}:N', title=None, axis=alt.Axis(labelAngle=0)), # 글자 각도 0도 고정
-        y=alt.Y(f'{y_col}:Q', title=None),
-        tooltip=[x_col, y_col]
-    ).properties(height=300)
+    chart = (
+        alt.Chart(chart_data)
+        .mark_bar(color=color)
+        .encode(
+            x=alt.X(
+                f"{x_col}:N", title=None, axis=alt.Axis(labelAngle=0)
+            ),  # 글자 각도 0도 고정
+            y=alt.Y(f"{y_col}:Q", title=None),
+            tooltip=[x_col, y_col],
+        )
+        .properties(height=300)
+    )
 
     st.altair_chart(chart, use_container_width=True)
+
 
 st.title("🛋️ Vench")
 st.subheader("번아웃 온 당신, 30초만 털어놓으세요.")
@@ -38,8 +48,10 @@ with st.sidebar:
                 data = res.json()
                 if data:
                     st.write("최근 감정 분포")
-                    df_weekly = pd.DataFrame(list(data.items()), columns=['감정', '횟수'])
-                    df_weekly.set_index('감정', inplace=True)
+                    df_weekly = pd.DataFrame(
+                        list(data.items()), columns=["감정", "횟수"]
+                    )
+                    df_weekly.set_index("감정", inplace=True)
 
                     # 사이드바용 가로 레이블 차트 렌더링
                     render_styled_chart(df_weekly, "#4A90E2")
@@ -58,9 +70,21 @@ with st.sidebar:
 # --- 메인 기능 영역 ---
 EMOTION_THEMES = {
     "기쁨": {"emoji": "💛", "msg": "긍정적인 에너지가 가득하네요!", "color": "#FFD700"},
-    "슬픔": {"emoji": "💧", "msg": "마음이 무거우셨군요. 따뜻한 차 한 잔 어때요?", "color": "#1E90FF"},
-    "분노": {"emoji": "🔥", "msg": "스트레스가 많으셨네요. 잠시 심호흡하세요.", "color": "#FF4500"},
-    "불안": {"emoji": "☁️", "msg": "걱정이 많으시군요. 잠시 명상을 해보세요.", "color": "#9370DB"},
+    "슬픔": {
+        "emoji": "💧",
+        "msg": "마음이 무거우셨군요. 따뜻한 차 한 잔 어때요?",
+        "color": "#1E90FF",
+    },
+    "분노": {
+        "emoji": "🔥",
+        "msg": "스트레스가 많으셨네요. 잠시 심호흡하세요.",
+        "color": "#FF4500",
+    },
+    "불안": {
+        "emoji": "☁️",
+        "msg": "걱정이 많으시군요. 잠시 명상을 해보세요.",
+        "color": "#9370DB",
+    },
     "평온": {"emoji": "🌿", "msg": "차분하고 안정적인 상태입니다.", "color": "#2E8B57"},
 }
 
@@ -71,7 +95,9 @@ with tab1:
     audio_data = st.audio_input("녹음 시작")
 
     if audio_data:
-        if st.button("💾 일기 저장 및 정밀 분석 시작", key="record_btn", type="primary"):
+        if st.button(
+            "💾 일기 저장 및 정밀 분석 시작", key="record_btn", type="primary"
+        ):
             with st.status("🚀 AI가 분석 중입니다...", expanded=True) as status:
                 files = {"file": ("voice_journal.wav", audio_data, "audio/wav")}
                 try:
@@ -88,23 +114,32 @@ with tab1:
                             res = requests.get(f"{BACKEND_URL}/diaries/{diary_id}")
                             if res.status_code == 200:
                                 data = res.json()
-                                if data['status'] == "COMPLETED":
-                                    status.update(label="분석 완료!", state="complete", expanded=False)
+                                if data["status"] == "COMPLETED":
+                                    status.update(
+                                        label="분석 완료!",
+                                        state="complete",
+                                        expanded=False,
+                                    )
                                     progress_bar.progress(100)
                                     st.balloons()
                                     st.divider()
 
-                                    label = data['emotion_label']
-                                    theme = EMOTION_THEMES.get(label, EMOTION_THEMES["평온"])
+                                    label = data["emotion_label"]
+                                    theme = EMOTION_THEMES.get(
+                                        label, EMOTION_THEMES["평온"]
+                                    )
 
                                     col1, col2 = st.columns([1, 1.5])
                                     with col1:
-                                        st.markdown(f"""
-                                        <div style="padding: 20px; border-radius: 15px; border: 2px solid {theme['color']}; text-align: center;">
-                                            <h1 style="margin:0;">{theme['emoji']}</h1>
-                                            <h2 style="color: {theme['color']};">{label}</h2>
+                                        st.markdown(
+                                            f"""
+                                        <div style="padding: 20px; border-radius: 15px; border: 2px solid {theme["color"]}; text-align: center;">
+                                            <h1 style="margin:0;">{theme["emoji"]}</h1>
+                                            <h2 style="color: {theme["color"]};">{label}</h2>
                                         </div>
-                                        """, unsafe_allow_html=True)
+                                        """,
+                                            unsafe_allow_html=True,
+                                        )
                                     with col2:
                                         st.caption("AI 위로 메시지")
                                         st.info(f"{theme['msg']}")
@@ -112,13 +147,13 @@ with tab1:
                                         st.write(f"_{data['transcript']}_")
 
                                     # 메인 분석 결과 가로 레이블 차트 렌더링
-                                    if data['emotion_score']:
+                                    if data["emotion_score"]:
                                         st.write("📊 상세 감정 분석 결과")
-                                        df_result = pd.DataFrame(data['emotion_score'])
+                                        df_result = pd.DataFrame(data["emotion_score"])
                                         df_result.set_index("label", inplace=True)
-                                        render_styled_chart(df_result, theme['color'])
+                                        render_styled_chart(df_result, theme["color"])
                                     break
-                                elif data['status'] == "FAILED":
+                                elif data["status"] == "FAILED":
                                     st.error("분석 실패")
                                     break
                         else:

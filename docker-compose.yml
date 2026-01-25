@@ -13,6 +13,7 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=mysql+pymysql://user:password@db:3306/vench
+      - UPLOAD_DIR=/app/data/audio
     depends_on:
       - db
     labels:

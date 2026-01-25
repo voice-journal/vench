@@ -5,6 +5,7 @@ from app.database import engine, Base, get_db, SessionLocal
 from app.models import Diary
 import shutil, os, uuid, logging
 from app.services.emotion_service import analyze_emotion
+from app.routers.diaries import router as diaries_router
 
 # DB 초기화 (테이블 생성)
 Base.metadata.create_all(bind=engine)
@@ -13,6 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("vench")
 
 app = FastAPI()
+app.include_router(diaries_router)
 Instrumentator().instrument(app).expose(app)
 
 UPLOAD_DIR = "data/audio"

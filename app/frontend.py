@@ -1,5 +1,6 @@
 import time
 
+import altair as alt
 import pandas as pd
 import requests
 import streamlit as st
@@ -8,6 +9,30 @@ import streamlit as st
 BACKEND_URL = "http://backend:8000"
 
 st.set_page_config(page_title="Vench", page_icon="🛋️", layout="wide")  # 넓은 화면 사용
+
+
+# 가독성을 위해 차트 레이블을 가로로 고정하는 헬퍼 함수
+def render_styled_chart(df, color):
+    chart_data = df.reset_index()
+    # 컬럼명이 'label' 또는 '감정'일 수 있으므로 유연하게 대응
+    x_col = chart_data.columns[0]
+    y_col = chart_data.columns[1]
+
+    chart = (
+        alt.Chart(chart_data)
+        .mark_bar(color=color)
+        .encode(
+            x=alt.X(
+                f"{x_col}:N", title=None, axis=alt.Axis(labelAngle=0)
+            ),  # 글자 각도 0도 고정
+            y=alt.Y(f"{y_col}:Q", title=None),
+            tooltip=[x_col, y_col],
+        )
+        .properties(height=300)
+    )
+
+    st.altair_chart(chart, use_container_width=True)
+
 
 st.title("🛋️ Vench")
 st.subheader("번아웃 온 당신, 30초만 털어놓으세요.")
@@ -18,21 +43,19 @@ with st.sidebar:
     st.header("📊 나의 감정 리포트")
     if st.button("🔄 리포트 새로고침"):
         try:
-            # 백엔드에서 통계 데이터 가져오기
             res = requests.get(f"{BACKEND_URL}/reports/weekly")
             if res.status_code == 200:
-                data = res.json()  # {'기쁨': 3, '불안': 2 ...}
-
+                data = res.json()
                 if data:
                     st.write("최근 감정 분포")
-                    # 데이터프레임 변환
-                    df = pd.DataFrame(list(data.items()), columns=["감정", "횟수"])
-                    df.set_index("감정", inplace=True)
+                    df_weekly = pd.DataFrame(
+                        list(data.items()), columns=["감정", "횟수"]
+                    )
+                    df_weekly.set_index("감정", inplace=True)
 
-                    # 도넛 차트 같은 막대 차트 보여주기
-                    st.bar_chart(df)
+                    # 사이드바용 가로 레이블 차트 렌더링
+                    render_styled_chart(df_weekly, "#4A90E2")
 
-                    # 가장 많이 느낀 감정 찾기
                     top_emotion = max(data, key=data.get)
                     st.success(f"최근 **'{top_emotion}'**을(를) 가장 많이 느끼셨네요!")
                 else:
@@ -98,7 +121,6 @@ with tab1:
                                         expanded=False,
                                     )
                                     progress_bar.progress(100)
-
                                     st.balloons()
                                     st.divider()
 
@@ -124,11 +146,12 @@ with tab1:
                                         st.caption("인식된 내용")
                                         st.write(f"_{data['transcript']}_")
 
-                                    # 상세 차트
+                                    # 메인 분석 결과 가로 레이블 차트 렌더링
                                     if data["emotion_score"]:
-                                        df = pd.DataFrame(data["emotion_score"])
-                                        df.set_index("label", inplace=True)
-                                        st.bar_chart(df, color=theme["color"])
+                                        st.write("📊 상세 감정 분석 결과")
+                                        df_result = pd.DataFrame(data["emotion_score"])
+                                        df_result.set_index("label", inplace=True)
+                                        render_styled_chart(df_result, theme["color"])
                                     break
                                 elif data["status"] == "FAILED":
                                     st.error("분석 실패")

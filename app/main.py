@@ -9,10 +9,16 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+# ✅ 추가: 피드백 요청 JSON 파싱용
+from pydantic import BaseModel, Field
+
 from app.database import Base, SessionLocal, engine, get_db
 from app.models import Diary
 from app.services.emotion_service import analyze_emotion
 from app.services.stt_service import transcribe # 팀원 B님의 STT 엔진
+
+# ✅ 추가: 피드백 서비스 import (파일명: app/services/feedback.py)
+from app.services.feedback import create_feedback, CreateFeedbackCommand
 
 # DB 초기화
 Base.metadata.create_all(bind=engine)
@@ -132,3 +138,30 @@ def get_weekly_report(db: Session = Depends(get_db)):
         .all()
     )
     return {label: count for label, count in stats if label}
+
+# ✅ 추가: 사용자 피드백 API
+class FeedbackRequest(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+    comment: str | None = Field(default=None, max_length=5000)
+
+@app.post("/diaries/{diary_id}/feedback")
+def create_diary_feedback(
+    diary_id: int,
+    req: FeedbackRequest,
+    db: Session = Depends(get_db),
+):
+    result = create_feedback(
+        db,
+        CreateFeedbackCommand(
+            diary_id=diary_id,
+            rating=req.rating,
+            comment=req.comment,
+        ),
+    )
+
+    return {
+        "id": result.id,
+        "diary_id": result.diary_id,
+        "rating": result.rating,
+        "comment": result.comment,
+    }

@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 load_dotenv()
 
 DATABASE_URL = os.getenv(
-    "DATABASE_URL", "mysql+pymysql://user:password@localhost:3306/vench"
+    "DATABASE_URL", "mysql+pymysql://user:password@localhost:3306/vench?charset=utf8mb4"
 )
 
 engine = create_engine(DATABASE_URL)

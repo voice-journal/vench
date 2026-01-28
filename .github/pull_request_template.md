@@ -1,14 +1,26 @@
-## 📌 개요 (What is this?)
-- 프로젝트 초기 인프라(Docker, FastAPI, Streamlit) 및 기본 구조 셋업
+## 📌 작업 유형 (Type of Change)
+- [ ] ✨ 신규 기능 추가 (Feature)
+- [ ] 🐛 버그 수정 (Bug Fix)
+- [ ] ♻️ 리팩토링 (Refactoring)
+- [ ] 📝 문서 수정 (Documentation)
+- [ ] 🔧 설정 변경 (Config/Infra)
 
-## 🛠️ 작업 내용 (Key Changes)
-- [x] Dockerfile & docker-compose.yml 작성 (Local All-in 전략)
-- [x] FastAPI 백엔드 스켈레톤 코드 구현 (DB 연결 포함)
-- [x] Streamlit 프론트엔드 기본 UI 구현 (녹음/업로드 탭)
-- [x] 로컬 데이터 보호를 위한 .gitignore 설정
-- [x] PR 템플릿 추가
+## 📖 작업 내용 (What is this PR?)
+- 
+-
 
-## 📸 스크린샷 (UI 변경 시)
+## 🛠️ 세부 변경 사항 (Detailed Changes)
+- [ ] **Data/Model:** DB 스키마 변경 및 `models.py` 수정 여부
+- [ ] **API:** 엔드포인트 추가/수정 및 파라미터 변경 사항
+- [ ] **Service/AI:** AI 로직 및 비즈니스 로직 수정 사항
+- [ ] **UI:** Streamlit 화면 구성 및 컴포넌트 추가
+
 ## ✅ 체크리스트 (Checklist)
-- [x] 로컬에서 `uv pip install` 및 실행 테스트를 마쳤나요?
-- [x] `docker-compose` 빌드가 에러 없이 통과되나요?
+- [ ] 로컬에서 `uv pip install` 및 실행 테스트를 마쳤나요?
+- [ ] `docker-compose` 빌드가 에러 없이 통과되나요?
+- [ ] 새로운 환경 변수(`.env`)나 라이브러리(`requirements.txt`)가 추가되었나요?
+- [ ] 관련 API 문서(Swagger)에서 정상 작동을 확인했나요?
+- [ ] AI 모델(STT/NLP)의 결과값이 예상대로 반환되나요?
+
+## 📸 스크린샷 / 테스트 결과 (Screenshots or Test Results)
+## ⚠️ 기타 참고 사항 (Notes)

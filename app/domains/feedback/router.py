@@ -10,25 +10,25 @@ router = APIRouter()
 
 # TODO: DTO 분리해주세요! -> schemas.py
 class FeedbackRequest(BaseModel):
+    diary_id: int
     rating: int = Field(..., ge=1, le=5)
     comment: str | None = Field(default=None, max_length=5000)
 
 # TODO: 상태 코드 지정해주세요!
 @router.post(
-    "/",
+    "",
     # response_model=FeedbackResponse, 
     # status_code=status.HTTP_201_CREATED,
     summary="피드백 작성"        
 )
 def create_diary_feedback(
-    diary_id: int,
     req: FeedbackRequest,
     db: Session = Depends(get_db),
 ):
     result = create_feedback(
         db,
         CreateFeedbackCommand(
-            diary_id=diary_id,
+            diary_id=req.diary_id,  # NOTE: diary_id -> request body로 이동
             rating=req.rating,
             comment=req.comment,
         ),

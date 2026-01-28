@@ -32,5 +32,10 @@ LOGGING_CONFIG = {
             "level": LOG_LEVEL,
             "propagate": False,
         },
+        "sqlalchemy.engine": {
+            "handlers": ["console"],
+            "level": "INFO",  # INFO로 설정하면 모든 SQL 쿼리가 보입니다.
+            "propagate": False,
+        },
     },
 }

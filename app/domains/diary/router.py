@@ -3,12 +3,13 @@ import shutil
 from fastapi import APIRouter, Depends, File, UploadFile, BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Diary
+from app.domains.diary.models import Diary
 from app.services.diary_task import process_audio_task, UPLOAD_DIR
 
 router = APIRouter()
 
 # TODO: DTO(-> schemas.py), 응답 상태 코드 지정해주세요!
+# TODO: 서비스 로직 분리해주세요!
 @router.post(
     "/", 
     # response_model=DiaryResponse, 
@@ -31,10 +32,11 @@ async def create_diary(
     db.commit()
     db.refresh(new_diary)
 
-    bg_tasks.add_task(process_audio_task, new_diary.id)
+    bg_tasks.add_task(process_audio_task, new_diary.id) # FIXME: 여기 타입 에러 나요~
     return {"id": new_diary.id}
 
 # TODO: DTO(-> schemas.py), 응답 상태 코드 지정해주세요!
+# TODO: 서비스 로직 분리해주세요!
 @router.get(
     "/{diary_id}", 
     # response_model=DiaryResponse,

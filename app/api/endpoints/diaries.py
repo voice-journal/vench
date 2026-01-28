@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, File, UploadFile, BackgroundTasks, HTTPE
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Diary
-from app.main import process_audio_task, UPLOAD_DIR # 공통 로직 참조
+from app.services.diary_task import process_audio_task, UPLOAD_DIR
 
 router = APIRouter()
 

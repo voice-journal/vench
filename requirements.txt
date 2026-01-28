@@ -1,3 +1,4 @@
+# --- Backend Core ---
 fastapi
 uvicorn[standard]
 python-multipart
@@ -5,13 +6,18 @@ sqlalchemy
 pymysql
 cryptography
 python-dotenv
-requests
-streamlit
+
+# --- AI Services ---
 faster-whisper
-prometheus-fastapi-instrumentator
-pandas
 transformers
 torch
-python-dotenv
 sentencepiece
+
+# --- Frontend & Visualization ---
+streamlit
+requests
 pandas
+altair  # [추가] 차트 렌더링을 위해 필수
+
+# --- Monitoring ---
+prometheus-fastapi-instrumentator

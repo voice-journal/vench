@@ -2,7 +2,7 @@ import uuid
 import shutil
 from fastapi import APIRouter, Depends, File, UploadFile, BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
-from app.database import get_db
+from app.core.database import get_db
 from app.domains.diary.models import Diary
 from app.services.diary_task import process_audio_task, UPLOAD_DIR
 

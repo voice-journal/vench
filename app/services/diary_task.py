@@ -1,6 +1,6 @@
 import os
 from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from app.core.database import SessionLocal
 from app.domains.diary.models import Diary
 from app.services.stt_service import transcribe
 from app.services.emotion_service import analyze_emotion

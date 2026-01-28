@@ -1,12 +1,20 @@
 import logging
 import logging.config
+
 from fastapi import FastAPI
 from fastapi import Request
+from fastapi.concurrency import asynccontextmanager
 from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
+
 from app.api.api import api_router
-from app.database import Base, engine
+from app.core.database import Base, engine
 from app.core.exceptions import BusinessException
+from app.core.config import settings
+
+from app.domains.auth import models as auth_models
+from app.domains.diary import models as diary_models
+from app.domains.feedback import models as feedback_models
 
 # ==========================================
 # 1. 로깅 설정 로드 (Logging Setup)
@@ -22,19 +30,38 @@ except ImportError:
 # "Vench" 로거를 가져와야 설정(logging.py)이 적용된 포맷으로 출력됩니다.
 logger = logging.getLogger("Vench")
 
+
 # ==========================================
-# 2. 애플리케이션 초기화
+# 2. Lifespan (앱 수명 주기 관리)
+# ==========================================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # [Start] 서버 시작 시 실행
+    
+    # 1. 설정 로그 출력
+    logger.info("🚀 Vench Backend Server is starting up...")
+
+    # 2. DB 테이블 생성
+    Base.metadata.create_all(bind=engine)
+    
+    yield # 앱 실행 중
+    
+    # [Shutdown] 서버 종료 시 실행
+    logger.info("👋 Vench Backend Server is shutting down...")
+
+# ==========================================
+# 3. 애플리케이션 초기화
 # ==========================================
 # DB 테이블 자동 생성 (실무에서는 Alembic 마이그레이션 권장)
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Vench API")
+app = FastAPI(title="Vench API", lifespan=lifespan)
 
 # Prometheus 모니터링 엔드포인트 노출 (/metrics)
 Instrumentator().instrument(app).expose(app)
 
 # ==========================================
-# 3. 전역 예외 핸들러 (Global Exception Handler)
+# 4. 전역 예외 핸들러 (Global Exception Handler)
 # ==========================================
 @app.exception_handler(BusinessException)
 async def business_exception_handler(request: Request, exc: BusinessException):    
@@ -55,6 +82,6 @@ async def business_exception_handler(request: Request, exc: BusinessException):
     )
 
 # ==========================================
-# 4. 라우터 등록
+# 5. 라우터 등록
 # ==========================================
 app.include_router(api_router)

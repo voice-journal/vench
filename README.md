@@ -14,6 +14,7 @@
 * **🧠 감정 정밀 분석 (v2.0)**: `mDeBERTa` 모델이 **8가지 핵심 감정**(기쁨, 슬픔, 분노, 불안, 평온, **피로, 뿌듯, 설렘**)을 분석하고 수치화합니다.
 * **✍️ AI 일기 & 제목 생성**: **LG EXAONE 3.0 (7.8B)** LLM이 구어체 기록을 차분한 문어체 일기로 다듬고, 하루를 은유하는 **감성 제목**을 지어줍니다.
 * **💌 맞춤형 위로 메시지**: 분석된 감정과 내용을 바탕으로 심리 상담사 페르소나의 AI가 따뜻한 위로를 건넵니다.
+* **⏳ 실시간 진행 상태 공유**: "감정 분석 중...", "위로 메시지 작성 중..." 등 AI의 분석 과정을 실시간으로 보여주어 기다림을 덜어줍니다.
 * **📊 주간 리포트**: 사이드바에서 내 감정의 흐름과 빈도수를 시각화된 차트로 확인할 수 있습니다.
 * **🔒 프라이버시 보호**: 모든 데이터는 내 컴퓨터(MySQL)에만 저장되며 외부로 유출되지 않습니다.
 
@@ -23,7 +24,7 @@
 | **Backend** | FastAPI (v3.12) | 비동기 API 서버, 백그라운드 태스크 관리 |
 | **Frontend** | Streamlit | 반응형 대화형 UI, 실시간 데이터 시각화 (Altair) |
 | **AI (STT)** | Faster-Whisper | `small` 모델 (Int8 Quantized) - 고속 음성 변환 |
-| **AI (NLP)** | Transformers | `mDeBERTa-v3-base` - 제로샷 감정 분류 |
+| **AI (NLP)** | Transformers | `mDeBERTa-v3-base` - 제로샷 감정 분류 (8종) |
 | **AI (LLM)** | **Llama.cpp (Python)** | **LG EXAONE 3.0 7.8B Instruct (GGUF)** - 일기/제목/위로 생성 |
 | **Database** | MySQL 8.0 | 사용자 정보, 일기 데이터, 감정 분석 결과 저장 |
 | **Infra** | Docker Compose | 서비스 전체 컨테이너 오케스트레이션 |
@@ -32,8 +33,8 @@
 1. **User**가 Streamlit UI를 통해 음성을 녹음 및 업로드.
 2. **FastAPI** 서버가 요청을 받아 비동기 처리를 시작 (`202 Accepted`).
 3. **STT Service**가 오디오를 텍스트로 변환 (WAV 16kHz 변환 포함).
-4. **Emotion Service**가 텍스트에서 감정을 추출.
-5. **Diary Service-LLM**가 일기 본문 요약, 제목 창작, 위로 메시지를 생성.
+4. **Emotion Service**가 텍스트에서 8가지 감정 중 하나를 추출.
+5. **Diary Service (LLM)**가 일기 본문 요약, 제목 창작, 위로 메시지를 생성.
 6. 모든 결과는 **MySQL**에 저장되고, UI에서 Polling을 통해 실시간 완료 처리.
 
 ## 🏃 시작하기 (Quick Start)

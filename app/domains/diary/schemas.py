@@ -13,6 +13,7 @@ class DiaryUpdate(BaseModel):
     title: Optional[str] = None
     transcript: Optional[str] = None
     summary: Optional[str] = None
+    advice: Optional[str] = None  # [New]
     emotion_label: Optional[str] = None
     emotion_score: Optional[str] = None
     status: Optional[str] = None
@@ -24,6 +25,7 @@ class DiaryResponse(BaseModel):
     title: Optional[str] = None
     transcript: Optional[str] = None
     summary: Optional[str] = None
+    advice: Optional[str] = None  # [New] AI 위로 메시지 전달
     emotion_label: Optional[str] = None
 
     # DB의 JSON 문자열을 유연하게 처리

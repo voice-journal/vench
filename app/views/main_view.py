@@ -7,70 +7,18 @@ import random
 import json
 from datetime import datetime
 
-# --- [1] 감정별 테마 및 위로 메시지 풀(Pool) 설정 ---
+# --- [1] 감정별 테마 (메시지는 백업용으로 유지) ---
 EMOTION_THEMES = {
-    "기쁨": {
-        "emoji": "💛",
-        "color": "#FFD700",
-        "msgs": [
-            "오늘 하루, 정말 반짝반짝 빛나셨군요! ✨",
-            "당신의 웃음이 여기까지 전해지는 것 같아요.",
-            "기분 좋은 에너지! 이 순간을 오래오래 기억하세요.",
-            "오늘의 행복이 내일의 힘이 될 거예요.",
-            "정말 수고 많으셨어요. 푹 쉬고 좋은 꿈 꾸세요!"
-        ]
-    },
-    "슬픔": {
-        "emoji": "💧",
-        "color": "#1E90FF",
-        "msgs": [
-            "괜찮아요. 가끔은 소리 내어 울어도 돼요.",
-            "오늘은 마음이 시키는 대로 푹 쉬어가세요.",
-            "비가 온 뒤에 땅이 굳듯이, 내일은 조금 더 단단해질 거예요.",
-            "당신 잘못이 아니에요. 너무 자책하지 마세요.",
-            "따뜻한 차 한 잔 마시며 마음을 토닥여주세요."
-        ]
-    },
-    "분노": {
-        "emoji": "🔥",
-        "color": "#FF4500",
-        "msgs": [
-            "많이 속상하셨겠어요. 깊게 심호흡 한번 해볼까요?",
-            "화나는 감정은 당연한 거예요. 억누르지 마세요.",
-            "오늘은 맛있는 거 드시고 스트레스를 날려버리세요!",
-            "잠시 눈을 감고 3초만 세어보세요. 후- 하-",
-            "당신의 감정은 틀리지 않았어요. 오늘은 당신 편이 되어줄게요."
-        ]
-    },
-    "불안": {
-        "emoji": "☁️",
-        "color": "#9370DB",
-        "msgs": [
-            "너무 걱정하지 마세요. 당신은 생각보다 강한 사람입니다.",
-            "일어나지 않은 일은 미리 걱정하지 않기로 해요.",
-            "지금 이 순간, 당신은 안전합니다.",
-            "천천히 한 걸음씩만 내딛으면 돼요. 서두르지 마세요.",
-            "오늘 밤은 아무 생각 말고 푹 주무시길 바라요."
-        ]
-    },
-    "평온": {
-        "emoji": "🌿",
-        "color": "#2E8B57",
-        "msgs": [
-            "잔잔한 호수 같은 하루였군요. 참 좋습니다.",
-            "이런 평범한 날들이 모여 당신을 지탱해 줄 거예요.",
-            "오늘의 차분한 마음을 잊지 마세요.",
-            "무탈한 하루가 가장 큰 행복일지도 몰라요.",
-            "편안한 밤 보내세요."
-        ]
-    },
+    "기쁨": {"emoji": "💛", "color": "#FFD700", "msgs": ["오늘 하루, 정말 반짝반짝 빛나셨군요! ✨"]},
+    "슬픔": {"emoji": "💧", "color": "#1E90FF", "msgs": ["괜찮아요. 가끔은 소리 내어 울어도 돼요."]},
+    "분노": {"emoji": "🔥", "color": "#FF4500", "msgs": ["화나는 감정은 당연한 거예요. 억누르지 마세요."]},
+    "불안": {"emoji": "☁️", "color": "#9370DB", "msgs": ["지금 이 순간, 당신은 안전합니다."]},
+    "평온": {"emoji": "🌿", "color": "#2E8B57", "msgs": ["잔잔한 호수 같은 하루였군요."]},
 }
 
 def render_styled_chart(df, color, is_probability=False):
     """
     차트 그리기 (높이 150px 고정)
-    - is_probability=True: Y축을 0~1로 고정 (메인 화면용)
-    - is_probability=False: Y축 자동 설정 (사이드바 통계용)
     """
     chart_data = df.reset_index()
     if len(chart_data.columns) < 2: return
@@ -143,7 +91,6 @@ def render_main():
     c1, c2 = st.columns([8, 2])
     with c1:
         st.title("🛋️ Vench")
-        # [수정] 부드럽고 편안한 문구로 변경
         st.subheader("잠시 쉬어가세요, 당신의 하루를 들어줄게요.")
     with c2:
         user_info = st.session_state.get("nickname", st.session_state.get("user_email", "Guest"))
@@ -176,17 +123,13 @@ def render_main():
                 st.write("📈 누적 감정 통계")
                 df_report = pd.DataFrame(list(data.items()), columns=["감정", "횟수"])
                 df_report.set_index("감정", inplace=True)
-
-                # 사이드바 통계는 횟수(False)
                 render_styled_chart(df_report, "#4A90E2", is_probability=False)
-
                 top_emotion = max(data, key=data.get)
                 st.success(f"최근 **'{top_emotion}'** 감정이 가장 많았어요.")
             else:
                 st.info("아직 데이터가 충분하지 않습니다.")
 
     # --- 메인 기능 (녹음) ---
-    # [수정] 부드러운 가이드 문구
     st.write("🎤 마이크를 켜고, 그저 편안하게 이야기해 보세요.")
     audio_data = st.audio_input("녹음 시작")
 
@@ -231,8 +174,10 @@ def render_main():
             label = data.get("emotion_label", "평온")
             theme = EMOTION_THEMES.get(label, EMOTION_THEMES["평온"])
 
-            msg_list = theme.get("msgs", ["수고했어요."])
-            random_msg = random.choice(msg_list)
+            # [New] AI 위로 메시지 우선 사용 (없으면 랜덤 백업 메시지)
+            ai_advice = data.get("advice")
+            if not ai_advice:
+                ai_advice = random.choice(theme.get("msgs", ["수고했어요."]))
 
             st.toast(f"분석 완료: 오늘의 감정은 '{label}' 입니다.", icon='✅')
 
@@ -249,7 +194,6 @@ def render_main():
                 </div>
                 """, unsafe_allow_html=True)
 
-                # 메인 화면 차트는 확률(True)
                 scores_data = data.get("emotion_score")
                 if scores_data:
                     try:
@@ -257,12 +201,10 @@ def render_main():
                             scores = json.loads(scores_data)
                         else:
                             scores = scores_data
-
                         if scores:
                             df_score = pd.DataFrame(scores)
                             df_score.rename(columns={"label": "감정", "score": "점수"}, inplace=True)
                             df_score.set_index("감정", inplace=True)
-
                             render_styled_chart(df_score, theme["color"], is_probability=True)
                     except Exception as e:
                         print(f"Chart Error: {e}")
@@ -272,7 +214,7 @@ def render_main():
                 st.markdown(f"### 📔 {title}")
 
                 st.caption("💌 AI 위로의 한마디")
-                st.info(f"{random_msg}")
+                st.info(f"{ai_advice}")  # [Updated] 변수 교체
 
                 st.markdown("---")
                 summary = data.get('summary') or '요약 내용을 생성할 수 없습니다.'
@@ -305,7 +247,13 @@ def render_main():
 
                     with st.expander(f"{emoji} [{date_str}] {title}"):
                         st.caption(f"감정: {emo}")
+
+                        # [New] 히스토리에서도 위로 메시지 확인 가능하도록 추가
+                        if item.get("advice"):
+                            st.info(f"💌 {item['advice']}")
+
                         st.write(item.get("summary") or "내용 없음")
+
                         if st.button("이 기록 다시 보기", key=f"hist_btn_{item['id']}"):
                             st.session_state["last_diary"] = item
                             st.rerun()

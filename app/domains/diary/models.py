@@ -17,6 +17,9 @@ class Diary(Base):
     transcript = Column(Text, nullable=True)
     summary = Column(Text, nullable=True)
 
+    # [New] AI 위로 메시지 저장용 컬럼 추가
+    advice = Column(Text, nullable=True)
+
     emotion_label = Column(String(50), index=True, nullable=True)
     emotion_score = Column(JSON, nullable=True)
     status = Column(String(20), default="PENDING", index=True) # PENDING, PROCESSING, COMPLETED, FAILED

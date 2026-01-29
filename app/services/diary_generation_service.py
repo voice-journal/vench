@@ -1,4 +1,3 @@
-# app/services/diary_generation_service.py
 import os
 import re
 from huggingface_hub import hf_hub_download
@@ -94,7 +93,7 @@ class DiaryGenerationService:
             response = self.llm.create_chat_completion(
                 messages=messages,
                 max_tokens=50,
-                temperature=0.7, # 제목은 약간 창의적이어도 됨 (0.3 -> 0.7)
+                temperature=0.7,
             )
             title = response["choices"][0]["message"]["content"]
 
@@ -111,6 +110,50 @@ class DiaryGenerationService:
             print(f"❌ Title Generation Error: {e}")
             # 실패 시 기존 방식(첫 문장)으로 백업
             return diary_content.split("\n")[0][:20] + "..."
+
+    def generate_advice(self, transcript: str, emotion_label: str) -> str:
+        """[New] 사용자 감정과 내용을 바탕으로 따뜻한 위로 메시지 생성"""
+        if not transcript: return "오늘 하루도 수고 많으셨어요."
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "당신은 공감 능력이 뛰어난 '전문 심리 상담사'입니다. "
+                    "사용자의 이야기와 감정을 듣고 따뜻한 위로와 격려의 말을 건네주세요.\n"
+                    "규칙:\n"
+                    "1. 말투: '~해요', '~네요' 등 부드럽고 친절한 존댓말을 사용하세요.\n"
+                    "2. 길이: 3문장 이내로 간결하지만 진심이 느껴지게 작성하세요.\n"
+                    "3. 내용: 사용자의 감정(기쁨/슬픔/분노 등)을 인정해주고, 긍정적인 메시지로 마무리하세요."
+                )
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"사용자 감정: {emotion_label}\n"
+                    f"사용자 이야기: \"{transcript}\"\n\n"
+                    "위 내용에 대해 따뜻한 위로의 말을 해줘."
+                )
+            }
+        ]
+
+        try:
+            response = self.llm.create_chat_completion(
+                messages=messages,
+                max_tokens=150,  # 짧고 굵게
+                temperature=0.7, # 감성적인 답변을 위해 약간 높게
+            )
+            advice = response["choices"][0]["message"]["content"]
+
+            # 후처리
+            advice = re.sub(r'[\u4e00-\u9fff]+', '', advice)
+            advice = advice.replace("[|assistant|]", "").strip()
+
+            return advice
+
+        except Exception as e:
+            print(f"❌ Advice Generation Error: {e}")
+            return "당신의 이야기를 들어줄 수 있어 기뻐요. 내일은 더 좋은 하루가 될 거예요."
 
 # 싱글톤 인스턴스
 diary_service = DiaryGenerationService()

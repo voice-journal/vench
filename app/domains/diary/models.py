@@ -8,25 +8,24 @@ class Diary(Base):
     __tablename__ = "diaries"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True) # [은수] 유저 연결
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     uuid = Column(String(36), unique=True, index=True)
     audio_path = Column(String(255), nullable=False)
 
-    # [성률] 자동 일기 생성 관련 컬럼
     title = Column(String(255), nullable=True)
     transcript = Column(Text, nullable=True)
     summary = Column(Text, nullable=True)
-
-    # [New] AI 위로 메시지 저장용 컬럼 추가
     advice = Column(Text, nullable=True)
+
+    # [New] 현재 진행 상황을 사용자에게 알려줄 메시지 저장
+    process_message = Column(String(255), nullable=True, default="분석 대기 중...")
 
     emotion_label = Column(String(50), index=True, nullable=True)
     emotion_score = Column(JSON, nullable=True)
-    status = Column(String(20), default="PENDING", index=True) # PENDING, PROCESSING, COMPLETED, FAILED
+    status = Column(String(20), default="PENDING", index=True)
     model_version = Column(String(50), default="v1.0")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
-    # 관계 설정
     user = relationship("User", back_populates="diaries")
     feedbacks = relationship(
         "Feedback",

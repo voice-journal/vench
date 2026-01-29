@@ -1,4 +1,3 @@
-# app/domains/diary/schemas.py
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Any
 from datetime import datetime
@@ -13,7 +12,8 @@ class DiaryUpdate(BaseModel):
     title: Optional[str] = None
     transcript: Optional[str] = None
     summary: Optional[str] = None
-    advice: Optional[str] = None  # [New]
+    advice: Optional[str] = None
+    process_message: Optional[str] = None # [New]
     emotion_label: Optional[str] = None
     emotion_score: Optional[str] = None
     status: Optional[str] = None
@@ -25,12 +25,13 @@ class DiaryResponse(BaseModel):
     title: Optional[str] = None
     transcript: Optional[str] = None
     summary: Optional[str] = None
-    advice: Optional[str] = None  # [New] AI 위로 메시지 전달
+    advice: Optional[str] = None
+
+    # [New] 프론트엔드로 진행 상황 텍스트 전달
+    process_message: Optional[str] = None
+
     emotion_label: Optional[str] = None
-
-    # DB의 JSON 문자열을 유연하게 처리
     emotion_score: Optional[Any] = None
-
     status: str
     model_version: str
     created_at: datetime

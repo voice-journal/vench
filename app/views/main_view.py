@@ -3,7 +3,8 @@ import requests
 import pandas as pd
 import altair as alt
 import time
-import random  # [New] 랜덤 메시지를 위해 추가
+import random
+import json
 from datetime import datetime
 
 # --- [1] 감정별 테마 및 위로 메시지 풀(Pool) 설정 ---
@@ -65,23 +66,31 @@ EMOTION_THEMES = {
     },
 }
 
-def render_styled_chart(df, color):
-    """차트 그리기"""
+def render_styled_chart(df, color, is_probability=False):
+    """
+    차트 그리기 (높이 150px 고정)
+    - is_probability=True: Y축을 0~1로 고정 (메인 화면용)
+    - is_probability=False: Y축 자동 설정 (사이드바 통계용)
+    """
     chart_data = df.reset_index()
     if len(chart_data.columns) < 2: return
 
     x_col = chart_data.columns[0]
     y_col = chart_data.columns[1]
 
+    # 확률일 때만 0~1 고정
+    y_scale = alt.Scale(domain=[0, 1]) if is_probability else alt.Undefined
+    tooltip_format = ".1%" if is_probability else "d"
+
     chart = (
         alt.Chart(chart_data)
         .mark_bar(color=color)
         .encode(
             x=alt.X(f"{x_col}:N", title=None, axis=alt.Axis(labelAngle=0)),
-            y=alt.Y(f"{y_col}:Q", title=None),
-            tooltip=[x_col, y_col],
+            y=alt.Y(f"{y_col}:Q", title=None, scale=y_scale),
+            tooltip=[x_col, alt.Tooltip(f"{y_col}", format=tooltip_format)],
         )
-        .properties(height=200)
+        .properties(height=150)
     )
     st.altair_chart(chart, use_container_width=True)
 
@@ -134,7 +143,8 @@ def render_main():
     c1, c2 = st.columns([8, 2])
     with c1:
         st.title("🛋️ Vench")
-        st.subheader("번아웃 온 당신, 30초만 털어놓으세요.")
+        # [수정] 부드럽고 편안한 문구로 변경
+        st.subheader("잠시 쉬어가세요, 당신의 하루를 들어줄게요.")
     with c2:
         user_info = st.session_state.get("nickname", st.session_state.get("user_email", "Guest"))
         st.caption(f"User: {user_info}")
@@ -147,42 +157,49 @@ def render_main():
     with st.sidebar:
         st.header("📊 나의 감정 리포트")
 
+        if "report_data" not in st.session_state:
+            st.session_state["report_data"] = None
+
         if st.button("🔄 리포트 새로고침", use_container_width=True):
             try:
                 res = requests.get(f"{BACKEND_URL}/reports/weekly", headers=headers)
                 if res.status_code == 200:
-                    data = res.json()
-                    if data:
-                        st.write("📈 누적 감정 통계")
-                        df_report = pd.DataFrame(list(data.items()), columns=["감정", "횟수"])
-                        df_report.set_index("감정", inplace=True)
-
-                        render_styled_chart(df_report, "#4A90E2")
-
-                        top_emotion = max(data, key=data.get)
-                        st.success(f"최근 **'{top_emotion}'** 감정이 가장 많았어요.")
-                    else:
-                        st.info("아직 데이터가 충분하지 않습니다.")
+                    st.session_state["report_data"] = res.json()
                 else:
                     st.warning("데이터를 불러올 수 없습니다.")
             except Exception as e:
                 st.error(f"연결 오류: {e}")
 
+        if st.session_state["report_data"]:
+            data = st.session_state["report_data"]
+            if data:
+                st.write("📈 누적 감정 통계")
+                df_report = pd.DataFrame(list(data.items()), columns=["감정", "횟수"])
+                df_report.set_index("감정", inplace=True)
+
+                # 사이드바 통계는 횟수(False)
+                render_styled_chart(df_report, "#4A90E2", is_probability=False)
+
+                top_emotion = max(data, key=data.get)
+                st.success(f"최근 **'{top_emotion}'** 감정이 가장 많았어요.")
+            else:
+                st.info("아직 데이터가 충분하지 않습니다.")
+
     # --- 메인 기능 (녹음) ---
-    st.write("🎤 마이크 버튼을 누르고 오늘 있었던 일을 털어놓으세요.")
+    # [수정] 부드러운 가이드 문구
+    st.write("🎤 마이크를 켜고, 그저 편안하게 이야기해 보세요.")
     audio_data = st.audio_input("녹음 시작")
 
     if audio_data:
         if st.button("💾 일기 저장 및 정밀 분석 시작", key="record_btn", type="primary"):
             files = {"file": ("voice_journal.wav", audio_data, "audio/wav")}
 
-            with st.status("🚀 AI가 분석 중입니다...", expanded=True) as status:
+            with st.status("🚀 AI가 당신의 하루를 듣고 있습니다...", expanded=True) as status:
                 try:
                     res = requests.post(f"{BACKEND_URL}/diaries/", files=files, headers=headers)
                     if res.status_code in [200, 201, 202]:
                         diary_id = res.json()["id"]
 
-                        # Polling
                         progress_bar = st.progress(0)
                         for i in range(100):
                             time.sleep(0.5)
@@ -201,7 +218,7 @@ def render_main():
                                     st.error("분석 중 오류가 발생했습니다.")
                                     break
                         else:
-                            st.error(f"분석 시간 초과 (백엔드 로그를 확인해주세요)")
+                            st.error(f"분석 시간 초과")
                     else:
                         st.error(f"저장 실패: {res.status_code}")
                 except Exception as e:
@@ -214,31 +231,46 @@ def render_main():
             label = data.get("emotion_label", "평온")
             theme = EMOTION_THEMES.get(label, EMOTION_THEMES["평온"])
 
-            # [수정] 랜덤 메시지 선택
-            # 세션 스테이트에 저장하지 않으면 리렌더링마다 메시지가 바뀔 수 있음.
-            # 하지만 간단한 위로 문구이므로 바뀔 때마다 새로운 위로를 받는 느낌도 나쁘지 않음.
             msg_list = theme.get("msgs", ["수고했어요."])
             random_msg = random.choice(msg_list)
 
-            # [삭제] st.snow() 제거 (담백한 UI)
-            # st.toast만 남겨둠
             st.toast(f"분석 완료: 오늘의 감정은 '{label}' 입니다.", icon='✅')
 
             st.divider()
+
             col1, col2 = st.columns([1, 1.5])
+
             with col1:
                 st.markdown(f"""
-                <div style="padding: 20px; border-radius: 15px; border: 2px solid {theme["color"]}; text-align: center;">
+                <div style="padding: 20px; border-radius: 15px; border: 2px solid {theme["color"]}; text-align: center; margin-bottom: 20px;">
                     <h1 style="margin:0; font-size: 3rem;">{theme["emoji"]}</h1>
                     <h2 style="color: {theme["color"]}; margin-top: 10px;">{label}</h2>
+                    <p style="color: gray; font-size: 0.8rem; margin-top: 5px;">감정 분석 결과</p>
                 </div>
                 """, unsafe_allow_html=True)
+
+                # 메인 화면 차트는 확률(True)
+                scores_data = data.get("emotion_score")
+                if scores_data:
+                    try:
+                        if isinstance(scores_data, str):
+                            scores = json.loads(scores_data)
+                        else:
+                            scores = scores_data
+
+                        if scores:
+                            df_score = pd.DataFrame(scores)
+                            df_score.rename(columns={"label": "감정", "score": "점수"}, inplace=True)
+                            df_score.set_index("감정", inplace=True)
+
+                            render_styled_chart(df_score, theme["color"], is_probability=True)
+                    except Exception as e:
+                        print(f"Chart Error: {e}")
 
             with col2:
                 title = data.get('title') or '오늘의 소중한 기록'
                 st.markdown(f"### 📔 {title}")
 
-                # [수정] 위로 메시지 섹션 개선
                 st.caption("💌 AI 위로의 한마디")
                 st.info(f"{random_msg}")
 

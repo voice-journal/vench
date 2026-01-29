@@ -4,7 +4,7 @@ import uuid
 import os
 from fastapi import UploadFile, BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
-
+from sqlalchemy import desc
 from app.domains.diary.models import Diary
 from app.services.diary_task import process_audio_task
 
@@ -44,3 +44,12 @@ def get_diary_by_id(db: Session, diary_id: int) -> Diary:
     if not diary:
         raise HTTPException(status_code=404, detail="Diary not found")
     return diary
+
+def get_all_diaries(db: Session, skip: int = 0, limit: int = 10):
+    query = db.query(Diary).filter(Diary.status == "COMPLETED")
+    total = query.count()
+
+    # 최신순 정렬 (내림차순)
+    items = query.order_by(desc(Diary.created_at)).offset(skip).limit(limit).all()
+
+    return {"items": items, "total": total}

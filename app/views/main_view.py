@@ -1,11 +1,11 @@
-# app/views/main_view.py
 import streamlit as st
 import requests
 import pandas as pd
 import altair as alt
 import time
+from datetime import datetime
 
-# --- 감정별 테마 설정 ---
+# --- [1] 감정별 테마 설정 ---
 EMOTION_THEMES = {
     "기쁨": {"emoji": "💛", "msg": "긍정적인 에너지가 가득하네요!", "color": "#FFD700"},
     "슬픔": {"emoji": "💧", "msg": "마음이 무거우셨군요. 따뜻한 차 한 잔 어때요?", "color": "#1E90FF"},
@@ -30,7 +30,7 @@ def render_styled_chart(df, color):
             y=alt.Y(f"{y_col}:Q", title=None),
             tooltip=[x_col, y_col],
         )
-        .properties(height=300)
+        .properties(height=200) # 높이 조절
     )
     st.altair_chart(chart, use_container_width=True)
 
@@ -79,7 +79,7 @@ def render_main():
     if "last_diary" not in st.session_state:
         st.session_state["last_diary"] = None
 
-    # --- 상단바 ---
+    # --- [상단바] ---
     c1, c2 = st.columns([8, 2])
     with c1:
         st.title("🛋️ Vench")
@@ -92,29 +92,34 @@ def render_main():
             st.rerun()
     st.markdown("---")
 
-    # --- 사이드바 (리포트) ---
+    # --- [사이드바] 감정 리포트 ---
     with st.sidebar:
         st.header("📊 나의 감정 리포트")
-        if st.button("🔄 리포트 새로고침"):
+
+        # [New] 자동 로딩 시도 (또는 버튼 클릭)
+        if st.button("🔄 리포트 새로고침", use_container_width=True):
             try:
                 res = requests.get(f"{BACKEND_URL}/reports/weekly", headers=headers)
                 if res.status_code == 200:
-                    data = res.json()
+                    data = res.json() # {"기쁨": 3, "슬픔": 1 ...}
                     if data:
-                        st.write("최근 감정 분포")
-                        df_weekly = pd.DataFrame(list(data.items()), columns=["감정", "횟수"])
-                        df_weekly.set_index("감정", inplace=True)
-                        render_styled_chart(df_weekly, "#4A90E2")
+                        st.write("📈 누적 감정 통계")
+                        # Dict -> DataFrame
+                        df_report = pd.DataFrame(list(data.items()), columns=["감정", "횟수"])
+                        df_report.set_index("감정", inplace=True)
+
+                        render_styled_chart(df_report, "#4A90E2")
+
                         top_emotion = max(data, key=data.get)
-                        st.success(f"최근 **'{top_emotion}'**을(를) 가장 많이 느끼셨네요!")
+                        st.success(f"최근 **'{top_emotion}'** 감정이 가장 많았어요.")
                     else:
-                        st.info("아직 분석된 데이터가 없습니다.")
+                        st.info("아직 데이터가 충분하지 않습니다.")
                 else:
-                    st.warning("리포트 데이터를 불러올 수 없습니다.")
+                    st.warning("데이터를 불러올 수 없습니다.")
             except Exception as e:
                 st.error(f"연결 오류: {e}")
 
-    # --- 메인 기능: 녹음 (탭 제거) ---
+    # --- 메인 기능 (녹음) ---
     st.write("🎤 마이크 버튼을 누르고 오늘 있었던 일을 털어놓으세요.")
     audio_data = st.audio_input("녹음 시작")
 
@@ -124,18 +129,15 @@ def render_main():
 
             with st.status("🚀 AI가 분석 중입니다...", expanded=True) as status:
                 try:
-                    # 1. 업로드
                     res = requests.post(f"{BACKEND_URL}/diaries/", files=files, headers=headers)
-
-                    if res.status_code in [200, 201, 202]:
+                    if res.status_code in [200, 201 ,202]:
                         diary_id = res.json()["id"]
 
-                        # 2. 폴링 (Polling)
+                        # Polling
                         progress_bar = st.progress(0)
-                        for i in range(100): # 약 50초 대기
+                        for i in range(100):
                             time.sleep(0.5)
                             progress_bar.progress(min(i + 1, 95))
-
                             chk = requests.get(f"{BACKEND_URL}/diaries/{diary_id}", headers=headers)
                             if chk.status_code == 200:
                                 data = chk.json()
@@ -143,21 +145,20 @@ def render_main():
                                     st.session_state["last_diary"] = data
                                     status.update(label="분석 완료!", state="complete", expanded=False)
                                     progress_bar.progress(100)
-                                    st.rerun() # 화면 갱신
+                                    st.rerun()
                                     break
                                 elif data["status"] == "FAILED":
                                     status.update(label="분석 실패", state="error")
                                     st.error("분석 중 오류가 발생했습니다.")
                                     break
                         else:
-                            status.update(label="분석 시간 초과", state="error")
-                            st.error("분석 시간이 너무 오래 걸립니다.")
+                            st.error("분석 시간 초과")
                     else:
                         st.error(f"저장 실패: {res.status_code}")
                 except Exception as e:
                     st.error(f"연결 오류: {e}")
 
-    # --- 분석 결과 렌더링 ---
+    # --- [분석 결과 뷰] ---
     if st.session_state["last_diary"] is not None:
         data = st.session_state["last_diary"]
         if data.get("status") == "COMPLETED":
@@ -168,42 +169,61 @@ def render_main():
             else: st.toast(f"'{label}' 감정 분석이 완료되었습니다!", icon='✅')
 
             st.divider()
-
-            col1, col2 = st.columns([1, 2])
-
+            col1, col2 = st.columns([1, 1.5])
             with col1:
                 st.markdown(f"""
-                <div style="padding: 20px; border-radius: 15px; border: 2px solid {theme["color"]}; text-align: center; background-color: rgba(255,255,255,0.05);">
-                    <h1 style="margin:0; font-size: 4rem;">{theme["emoji"]}</h1>
+                <div style="padding: 20px; border-radius: 15px; border: 2px solid {theme["color"]}; text-align: center;">
+                    <h1 style="margin:0; font-size: 3rem;">{theme["emoji"]}</h1>
                     <h2 style="color: {theme["color"]}; margin-top: 10px;">{label}</h2>
-                    <p style="margin-top: 10px; font-size: 0.9rem;">{theme["msg"]}</p>
                 </div>
                 """, unsafe_allow_html=True)
 
             with col2:
-                title = data.get('title') or '오늘의 기록'
+                title = data.get('title') or '오늘의 소중한 기록'
                 st.markdown(f"### 📔 {title}")
+                st.caption("AI 위로 메시지")
+                st.info(f"{theme['msg']}")
 
-                generated_content = data.get('summary') or "일기 생성 중 오류가 발생했습니다."
-                st.markdown(f"""
-                <div style="padding: 15px; border-left: 5px solid {theme['color']}; background-color: #f0f2f6; color: #333; border-radius: 5px;">
-                    <div style="font-size: 1.1rem; line-height: 1.6;">
-                        {generated_content}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown("---")
+                summary = data.get('summary') or '요약 내용을 생성할 수 없습니다.'
+                st.caption("AI가 정리한 오늘의 일기")
+                st.success(f"**{summary}**")
 
                 with st.expander("원본 녹음 내용 보기"):
                     st.write(data.get('transcript', ''))
 
-            if data.get("emotion_score"):
-                st.markdown("#### 📊 감정 세부 분석")
-                scores = data["emotion_score"]
-                if isinstance(scores, list):
-                    df_result = pd.DataFrame(scores).set_index("label")
-                else:
-                    df_result = pd.DataFrame(list(scores.items()), columns=["label", "score"]).set_index("label")
-                render_styled_chart(df_result, theme["color"])
-
             st.divider()
             render_feedback(data, headers)
+
+    # --- [New] 히스토리 (지난 기록) 섹션 ---
+    st.markdown("---")
+    st.subheader("📜 지난 기록 모아보기")
+
+    # 히스토리 불러오기 (자동)
+    try:
+        # limit=5 (최근 5개만)
+        hist_res = requests.get(f"{BACKEND_URL}/diaries/?skip=0&limit=5", headers=headers)
+        if hist_res.status_code == 200:
+            history_list = hist_res.json()["items"]
+
+            if not history_list:
+                st.info("아직 저장된 일기가 없습니다. 첫 기록을 남겨보세요!")
+            else:
+                for item in history_list:
+                    # 간단한 카드 형태로 출력
+                    emo = item.get("emotion_label", "평온")
+                    emoji = EMOTION_THEMES.get(emo, {}).get("emoji", "📄")
+                    date_str = item["created_at"][:10] # YYYY-MM-DD
+                    title = item.get("title") or "제목 없음"
+
+                    with st.expander(f"{emoji} [{date_str}] {title}"):
+                        st.caption(f"감정: {emo}")
+                        st.write(item.get("summary") or "내용 없음")
+                        # 상세보기 버튼 (누르면 위쪽 메인 뷰에 로드)
+                        if st.button("이 기록 다시 보기", key=f"hist_btn_{item['id']}"):
+                            st.session_state["last_diary"] = item
+                            st.rerun()
+        else:
+            st.warning("지난 기록을 불러올 수 없습니다.")
+    except Exception as e:
+        st.error(f"히스토리 로딩 실패: {e}")

@@ -1,4 +1,3 @@
-# app/services/diary_task.py
 import os
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
@@ -7,7 +6,6 @@ from app.domains.diary.models import Diary
 # 서비스 임포트
 from app.services.stt_service import transcribe
 from app.services.emotion_service import analyze_emotion
-# [변경] summary_service -> diary_generation_service
 from app.services.diary_generation_service import diary_service
 
 def process_audio_task(diary_id: int):
@@ -34,11 +32,18 @@ def process_audio_task(diary_id: int):
         diary.emotion_label = emotion_res["label"]
         diary.emotion_score = emotion_res["all_scores"]
 
-        # 3. [New] 일기 생성 (Gemma)
-        print("✍️ Generating Diary...")
+        # 3. [Updated] 일기 및 위로 메시지 생성
+        print("✍️ Generating Diary & Advice...")
+
+        # 3-1. 일기 본문
         generated_diary = diary_service.generate_diary(transcript, diary.emotion_label)
         diary.summary = generated_diary
+
+        # 3-2. 제목
         diary.title = diary_service.generate_title(generated_diary)
+
+        # 3-3. [New] 위로 메시지
+        diary.advice = diary_service.generate_advice(transcript, diary.emotion_label)
 
         diary.status = "COMPLETED"
         db.commit()

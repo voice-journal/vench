@@ -1,3 +1,4 @@
+# app/services/diary_generation_service.py
 import torch
 from transformers import pipeline
 
@@ -6,14 +7,14 @@ class DiaryGenerationService:
 
     def __new__(cls):
         if cls._instance is None:
-            print("⏳ Loading Gen-AI Model (Gemma-2b)...")
+            # [변경] Gemma-2b(8GB+) -> TinyLlama-1.1B(4GB)로 교체하여 OOM 방지
+            model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+            print(f"⏳ Loading Gen-AI Model ({model_id})...")
+
             cls._instance = super().__new__(cls)
-            # 로컬 메모리 최적화를 위해 bfloat16 또는 float32 사용
-            # M4 Pro는 MPS(Metal Performance Shaders) 사용 가능 시 "mps" 로 설정 추천하지만
-            # Docker 환경 호환성을 위해 우선 "cpu" + "float32" 로 안전하게 설정
             cls.generator = pipeline(
                 "text-generation",
-                model="beomi/gemma-ko-2b",
+                model=model_id,
                 device=-1,  # CPU
                 torch_dtype=torch.float32,
             )
@@ -21,45 +22,54 @@ class DiaryGenerationService:
         return cls._instance
 
     def generate_diary(self, transcript: str, emotion: str) -> str:
-        """
-        STT 결과와 감정을 입력받아, 따뜻한 일기체로 재생성
-        """
         if not transcript or len(transcript) < 5:
             return "내용이 너무 짧아 일기를 생성할 수 없어요."
 
-        # 프롬프트 엔지니어링
-        prompt = (
-            f"사용자의 말: \"{transcript}\"\n"
-            f"감정: {emotion}\n\n"
-            "위 내용을 바탕으로 오늘 하루를 회고하는 따뜻한 일기를 써줘:\n"
-            "오늘은 참"
-        )
+        # TinyLlama Chat 템플릿 적용
+        # (System Prompt로 페르소나 부여)
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a warm-hearted AI diary writer. Write a short, emotional diary entry in Korean based on the user's input."
+            },
+            {
+                "role": "user",
+                "content": f"다음 내용을 바탕으로 '{emotion}' 감정이 담긴 따뜻한 한국어 일기를 써줘. 시작은 '오늘은 참'으로 해줘.\n\n내용: {transcript}"
+            }
+        ]
+
+        # 프롬프트 변환
+        prompt = self.generator.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
         try:
-            # 생성 파라미터 튜닝
             results = self.generator(
                 prompt,
-                max_new_tokens=150,
+                max_new_tokens=200, # 생성 길이 제한
                 do_sample=True,
                 temperature=0.7,
                 top_p=0.9,
-                repetition_penalty=1.2
+                repetition_penalty=1.1
             )
 
             generated_text = results[0]['generated_text']
 
-            # 프롬프트 뒷부분(생성된 내용)만 추출 + 시작 문구 복구
-            final_diary = "오늘은 참" + generated_text.split("오늘은 참")[-1]
-            return final_diary.strip()
+            # 생성된 텍스트에서 답변 부분만 추출 (<|assistant|> 이후)
+            if "<|assistant|>" in generated_text:
+                final_diary = generated_text.split("<|assistant|>")[-1].strip()
+            else:
+                final_diary = generated_text
+
+            # 혹시 영어가 섞여 나올 경우를 대비한 안전장치 (선택 사항)
+            return final_diary
 
         except Exception as e:
             print(f"❌ Diary Generation Error: {e}")
-            # 실패 시 Fallback: 룰 기반 간단 변환
             return f"오늘은 {emotion}을(를) 느낀 하루였다. \"{transcript}\" 라는 일이 있었기 때문이다."
 
     def generate_title(self, diary_content: str) -> str:
-        """일기 내용의 첫 문장이나 키워드로 제목 생성"""
-        return diary_content[:20] + "..." if len(diary_content) > 20 else diary_content
+        # 제목 생성 로직 (첫 줄 사용)
+        first_line = diary_content.split("\n")[0]
+        return first_line[:20] + "..." if len(first_line) > 20 else first_line
 
 # 싱글톤 인스턴스
 diary_service = DiaryGenerationService()

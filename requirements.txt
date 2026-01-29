@@ -1,3 +1,4 @@
+# requirements.txt
 # --- Backend Core ---
 fastapi
 uvicorn[standard]
@@ -12,12 +13,14 @@ faster-whisper
 transformers
 torch
 sentencepiece
+accelerate  # [New] LLM 가속
+pydub       # [New] 오디오 포맷 변환 (WebM -> Wav)
 
 # --- Frontend & Visualization ---
 streamlit
 requests
 pandas
-altair  # [추가] 차트 렌더링을 위해 필수
+altair
 
 # --- Monitoring ---
 prometheus-fastapi-instrumentator

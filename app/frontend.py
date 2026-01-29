@@ -1,13 +1,23 @@
 import sys
 import os
 import streamlit as st
-from app.core.config import settings
 
-# app 폴더를 파이썬 경로에 추가 (모듈 임포트 에러 방지)
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# [1] 프로젝트 루트 경로를 Python Path에 추가 (에러 해결 핵심)
+# 현재 파일(frontend.py)의 부모 디렉토리(app)의 부모(루트)를 경로에 추가합니다.
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, ".."))
 
-from app.views.auth_view import main as render_auth
-from app.views.main_view import render_main
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# [2] 이제 app 패키지를 정상적으로 임포트할 수 있습니다.
+try:
+    from app.core.config import settings
+    from app.views.auth_view import main as render_auth
+    from app.views.main_view import render_main
+except ImportError as e:
+    st.error(f"모듈 임포트 실패: {e}")
+    st.stop()
 
 # [1] 페이지 설정
 st.set_page_config(page_title="Vench - 마음을 담는 공간", page_icon="🛋️", layout="wide")

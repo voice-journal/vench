@@ -1,10 +1,10 @@
 import os
 from sqlalchemy.orm import Session
-from app.database import SessionLocal
-from app.models import Diary
+from app.core.database import SessionLocal
+from app.domains.diary.models import Diary
 from app.services.stt_service import transcribe
 from app.services.emotion_service import analyze_emotion
-from app.services.summary_service import summary_service
+# from app.services.summary_service import summary_service
 
 UPLOAD_DIR = "data/audio"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -32,9 +32,9 @@ def process_audio_task(diary_id: int):
         diary.emotion_score = emotion_res["all_scores"]
 
         # 3. 요약 및 제목 생성
-        summary_text = summary_service.generate_summary(transcript)
-        diary.summary = summary_text
-        diary.title = summary_service.generate_title(summary_text)
+        # summary_text = summary_service.generate_summary(transcript)
+        # diary.summary = summary_text
+        # diary.title = summary_service.generate_title(summary_text)
 
         diary.status = "COMPLETED"
         db.commit()

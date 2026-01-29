@@ -1,9 +1,10 @@
 from fastapi import APIRouter
-from app.api.endpoints import auth, diaries, admin
+from app.domains.auth.router import router as auth_router
+from app.domains.diary.router import router as diary_router
+from app.domains.feedback.router import router as feedback_router
 
 api_router = APIRouter()
 
-# 도메인별로 경로(Prefix)와 태그를 지정하여 분리
-api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
-api_router.include_router(diaries.router, prefix="/diaries", tags=["diaries"])
-api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+api_router.include_router(auth_router, prefix="/auth", tags=["Auth"])
+api_router.include_router(diary_router, prefix="/diaries", tags=["Diary"])
+api_router.include_router(feedback_router, prefix="/feedbacks", tags=["Feedback"])

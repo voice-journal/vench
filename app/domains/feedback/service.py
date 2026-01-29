@@ -4,7 +4,8 @@ from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models import Diary, Feedback
+from app.domains.diary.models import Diary
+from app.domains.feedback.models import Feedback
 
 
 @dataclass(frozen=True)

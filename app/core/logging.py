@@ -1,0 +1,53 @@
+import os
+
+# 로그 레벨 설정 (기본값 INFO)
+LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
+
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {
+            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+    },
+    "handlers": {
+        "console": {
+            "formatter": "default",
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stdout",
+        },
+    },
+    "loggers": {
+        # ✅ 루트 로거 (모든 로그의 종착지)
+        # 이걸 설정해두면 놓치는 로그 없이 다 나옵니다.
+        "": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+        # 우리 프로젝트 전용 로거
+        "Vench": {
+            "handlers": ["console"],  # 파일 없이 콘솔만 사용
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        #  Uvicorn 시스템 로그 (시작/종료/에러)
+        "uvicorn.error": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        #  API 접근 로그 (GET /... 200 OK)
+        "uvicorn.access": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "sqlalchemy.engine": {
+            "handlers": ["console"],
+            "level": "INFO",  # INFO로 설정하면 모든 SQL 쿼리가 보입니다.
+            "propagate": False,
+        },
+    },
+}

@@ -3,15 +3,66 @@ import requests
 import pandas as pd
 import altair as alt
 import time
+import random  # [New] 랜덤 메시지를 위해 추가
 from datetime import datetime
 
-# --- [1] 감정별 테마 설정 ---
+# --- [1] 감정별 테마 및 위로 메시지 풀(Pool) 설정 ---
 EMOTION_THEMES = {
-    "기쁨": {"emoji": "💛", "msg": "긍정적인 에너지가 가득하네요!", "color": "#FFD700"},
-    "슬픔": {"emoji": "💧", "msg": "마음이 무거우셨군요. 따뜻한 차 한 잔 어때요?", "color": "#1E90FF"},
-    "분노": {"emoji": "🔥", "msg": "스트레스가 많으셨네요. 잠시 심호흡하세요.", "color": "#FF4500"},
-    "불안": {"emoji": "☁️", "msg": "걱정이 많으시군요. 잠시 명상을 해보세요.", "color": "#9370DB"},
-    "평온": {"emoji": "🌿", "msg": "차분하고 안정적인 상태입니다.", "color": "#2E8B57"},
+    "기쁨": {
+        "emoji": "💛",
+        "color": "#FFD700",
+        "msgs": [
+            "오늘 하루, 정말 반짝반짝 빛나셨군요! ✨",
+            "당신의 웃음이 여기까지 전해지는 것 같아요.",
+            "기분 좋은 에너지! 이 순간을 오래오래 기억하세요.",
+            "오늘의 행복이 내일의 힘이 될 거예요.",
+            "정말 수고 많으셨어요. 푹 쉬고 좋은 꿈 꾸세요!"
+        ]
+    },
+    "슬픔": {
+        "emoji": "💧",
+        "color": "#1E90FF",
+        "msgs": [
+            "괜찮아요. 가끔은 소리 내어 울어도 돼요.",
+            "오늘은 마음이 시키는 대로 푹 쉬어가세요.",
+            "비가 온 뒤에 땅이 굳듯이, 내일은 조금 더 단단해질 거예요.",
+            "당신 잘못이 아니에요. 너무 자책하지 마세요.",
+            "따뜻한 차 한 잔 마시며 마음을 토닥여주세요."
+        ]
+    },
+    "분노": {
+        "emoji": "🔥",
+        "color": "#FF4500",
+        "msgs": [
+            "많이 속상하셨겠어요. 깊게 심호흡 한번 해볼까요?",
+            "화나는 감정은 당연한 거예요. 억누르지 마세요.",
+            "오늘은 맛있는 거 드시고 스트레스를 날려버리세요!",
+            "잠시 눈을 감고 3초만 세어보세요. 후- 하-",
+            "당신의 감정은 틀리지 않았어요. 오늘은 당신 편이 되어줄게요."
+        ]
+    },
+    "불안": {
+        "emoji": "☁️",
+        "color": "#9370DB",
+        "msgs": [
+            "너무 걱정하지 마세요. 당신은 생각보다 강한 사람입니다.",
+            "일어나지 않은 일은 미리 걱정하지 않기로 해요.",
+            "지금 이 순간, 당신은 안전합니다.",
+            "천천히 한 걸음씩만 내딛으면 돼요. 서두르지 마세요.",
+            "오늘 밤은 아무 생각 말고 푹 주무시길 바라요."
+        ]
+    },
+    "평온": {
+        "emoji": "🌿",
+        "color": "#2E8B57",
+        "msgs": [
+            "잔잔한 호수 같은 하루였군요. 참 좋습니다.",
+            "이런 평범한 날들이 모여 당신을 지탱해 줄 거예요.",
+            "오늘의 차분한 마음을 잊지 마세요.",
+            "무탈한 하루가 가장 큰 행복일지도 몰라요.",
+            "편안한 밤 보내세요."
+        ]
+    },
 }
 
 def render_styled_chart(df, color):
@@ -30,7 +81,7 @@ def render_styled_chart(df, color):
             y=alt.Y(f"{y_col}:Q", title=None),
             tooltip=[x_col, y_col],
         )
-        .properties(height=200) # 높이 조절
+        .properties(height=200)
     )
     st.altair_chart(chart, use_container_width=True)
 
@@ -96,15 +147,13 @@ def render_main():
     with st.sidebar:
         st.header("📊 나의 감정 리포트")
 
-        # [New] 자동 로딩 시도 (또는 버튼 클릭)
         if st.button("🔄 리포트 새로고침", use_container_width=True):
             try:
                 res = requests.get(f"{BACKEND_URL}/reports/weekly", headers=headers)
                 if res.status_code == 200:
-                    data = res.json() # {"기쁨": 3, "슬픔": 1 ...}
+                    data = res.json()
                     if data:
                         st.write("📈 누적 감정 통계")
-                        # Dict -> DataFrame
                         df_report = pd.DataFrame(list(data.items()), columns=["감정", "횟수"])
                         df_report.set_index("감정", inplace=True)
 
@@ -130,7 +179,7 @@ def render_main():
             with st.status("🚀 AI가 분석 중입니다...", expanded=True) as status:
                 try:
                     res = requests.post(f"{BACKEND_URL}/diaries/", files=files, headers=headers)
-                    if res.status_code in [200, 201 ,202]:
+                    if res.status_code in [200, 201, 202]:
                         diary_id = res.json()["id"]
 
                         # Polling
@@ -152,7 +201,7 @@ def render_main():
                                     st.error("분석 중 오류가 발생했습니다.")
                                     break
                         else:
-                            st.error("분석 시간 초과")
+                            st.error(f"분석 시간 초과 (백엔드 로그를 확인해주세요)")
                     else:
                         st.error(f"저장 실패: {res.status_code}")
                 except Exception as e:
@@ -165,8 +214,15 @@ def render_main():
             label = data.get("emotion_label", "평온")
             theme = EMOTION_THEMES.get(label, EMOTION_THEMES["평온"])
 
-            if label == "기쁨": st.snow()
-            else: st.toast(f"'{label}' 감정 분석이 완료되었습니다!", icon='✅')
+            # [수정] 랜덤 메시지 선택
+            # 세션 스테이트에 저장하지 않으면 리렌더링마다 메시지가 바뀔 수 있음.
+            # 하지만 간단한 위로 문구이므로 바뀔 때마다 새로운 위로를 받는 느낌도 나쁘지 않음.
+            msg_list = theme.get("msgs", ["수고했어요."])
+            random_msg = random.choice(msg_list)
+
+            # [삭제] st.snow() 제거 (담백한 UI)
+            # st.toast만 남겨둠
+            st.toast(f"분석 완료: 오늘의 감정은 '{label}' 입니다.", icon='✅')
 
             st.divider()
             col1, col2 = st.columns([1, 1.5])
@@ -181,13 +237,15 @@ def render_main():
             with col2:
                 title = data.get('title') or '오늘의 소중한 기록'
                 st.markdown(f"### 📔 {title}")
-                st.caption("AI 위로 메시지")
-                st.info(f"{theme['msg']}")
+
+                # [수정] 위로 메시지 섹션 개선
+                st.caption("💌 AI 위로의 한마디")
+                st.info(f"{random_msg}")
 
                 st.markdown("---")
                 summary = data.get('summary') or '요약 내용을 생성할 수 없습니다.'
-                st.caption("AI가 정리한 오늘의 일기")
-                st.success(f"**{summary}**")
+                st.caption("📝 AI가 다듬은 오늘의 일기")
+                st.success(f"{summary}")
 
                 with st.expander("원본 녹음 내용 보기"):
                     st.write(data.get('transcript', ''))
@@ -195,13 +253,11 @@ def render_main():
             st.divider()
             render_feedback(data, headers)
 
-    # --- [New] 히스토리 (지난 기록) 섹션 ---
+    # --- 히스토리 섹션 ---
     st.markdown("---")
     st.subheader("📜 지난 기록 모아보기")
 
-    # 히스토리 불러오기 (자동)
     try:
-        # limit=5 (최근 5개만)
         hist_res = requests.get(f"{BACKEND_URL}/diaries/?skip=0&limit=5", headers=headers)
         if hist_res.status_code == 200:
             history_list = hist_res.json()["items"]
@@ -210,16 +266,14 @@ def render_main():
                 st.info("아직 저장된 일기가 없습니다. 첫 기록을 남겨보세요!")
             else:
                 for item in history_list:
-                    # 간단한 카드 형태로 출력
                     emo = item.get("emotion_label", "평온")
                     emoji = EMOTION_THEMES.get(emo, {}).get("emoji", "📄")
-                    date_str = item["created_at"][:10] # YYYY-MM-DD
+                    date_str = item["created_at"][:10]
                     title = item.get("title") or "제목 없음"
 
                     with st.expander(f"{emoji} [{date_str}] {title}"):
                         st.caption(f"감정: {emo}")
                         st.write(item.get("summary") or "내용 없음")
-                        # 상세보기 버튼 (누르면 위쪽 메인 뷰에 로드)
                         if st.button("이 기록 다시 보기", key=f"hist_btn_{item['id']}"):
                             st.session_state["last_diary"] = item
                             st.rerun()

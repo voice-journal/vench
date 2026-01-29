@@ -1,75 +1,95 @@
 # app/services/diary_generation_service.py
-import torch
-from transformers import pipeline
+import os
+import re
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
 
 class DiaryGenerationService:
     _instance = None
 
     def __new__(cls):
         if cls._instance is None:
-            # [변경] Gemma-2b(8GB+) -> TinyLlama-1.1B(4GB)로 교체하여 OOM 방지
-            model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-            print(f"⏳ Loading Gen-AI Model ({model_id})...")
+            print("⏳ Downloading LG EXAONE 3.0 7.8B (GGUF Quantized)...")
+
+            # 1. GGUF 모델 파일 다운로드 (최초 1회만 실행됨)
+            # 7.8B 모델을 4비트로 압축하여 약 5GB 정도의 메모리만 사용합니다.
+            model_path = hf_hub_download(
+                repo_id="mradermacher/EXAONE-3.0-7.8B-Instruct-GGUF",
+                filename="EXAONE-3.0-7.8B-Instruct.Q4_K_M.gguf",
+                cache_dir="./data/models"  # 모델 저장 위치
+            )
+
+            print(f"✅ Downloaded to: {model_path}")
+            print("⏳ Loading Llama CPP Engine...")
 
             cls._instance = super().__new__(cls)
-            cls.generator = pipeline(
-                "text-generation",
-                model=model_id,
-                device=-1,  # CPU
-                torch_dtype=torch.float32,
+
+            # 2. 엔진 초기화 (CPU 모드)
+            # n_ctx=4096: 긴 문맥 처리를 위한 설정
+            cls.llm = Llama(
+                model_path=model_path,
+                n_ctx=4096,
+                n_gpu_layers=0, # Docker(CPU) 환경이므로 0
+                verbose=False
             )
-            print("✅ Model Loaded!")
+            print("✅ LG EXAONE Model Loaded!")
         return cls._instance
 
     def generate_diary(self, transcript: str, emotion: str) -> str:
-        if not transcript or len(transcript) < 5:
-            return "내용이 너무 짧아 일기를 생성할 수 없어요."
+        if not transcript or len(transcript) < 10:
+            return transcript
 
-        # TinyLlama Chat 템플릿 적용
-        # (System Prompt로 페르소나 부여)
+        # 3. LG EXAONE Chat Template 구조에 맞춘 메시지 구성
+        # EXAONE은 한국어 지시 사항을 매우 잘 이해합니다.
         messages = [
             {
                 "role": "system",
-                "content": "You are a warm-hearted AI diary writer. Write a short, emotional diary entry in Korean based on the user's input."
+                "content": (
+                    "당신은 사용자의 하루를 따뜻하게 기록해주는 '감성 일기 에디터'입니다. "
+                    "아래 원칙을 엄격히 지켜주세요:\n"
+                    "1. [사실 준수]: 사용자가 언급하지 않은 내용(날씨, 음식 등)은 절대 지어내지 마세요.\n"
+                    "2. [문체 변환]: 구어체(말투)를 '오늘 나는 ~했다' 형태의 차분한 문어체 일기로 다듬으세요.\n"
+                    "3. [형식]: 한자나 괄호 설명을 쓰지 말고, 오직 자연스러운 한국어로만 작성하세요."
+                )
             },
             {
                 "role": "user",
-                "content": f"다음 내용을 바탕으로 '{emotion}' 감정이 담긴 따뜻한 한국어 일기를 써줘. 시작은 '오늘은 참'으로 해줘.\n\n내용: {transcript}"
+                "content": f"원문: \"{transcript}\"\n\n위 원문의 사실관계만 유지하면서 문장을 매끄러운 일기로 다듬어주세요."
             }
         ]
 
-        # 프롬프트 변환
-        prompt = self.generator.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-
         try:
-            results = self.generator(
-                prompt,
-                max_new_tokens=200, # 생성 길이 제한
-                do_sample=True,
-                temperature=0.7,
+            # 4. 추론 (Inference)
+            response = self.llm.create_chat_completion(
+                messages=messages,
+                max_tokens=400,
+                temperature=0.3,  # 사실 유지력 강화
                 top_p=0.9,
-                repetition_penalty=1.1
+                repeat_penalty=1.2
             )
 
-            generated_text = results[0]['generated_text']
+            generated_text = response["choices"][0]["message"]["content"]
 
-            # 생성된 텍스트에서 답변 부분만 추출 (<|assistant|> 이후)
-            if "<|assistant|>" in generated_text:
-                final_diary = generated_text.split("<|assistant|>")[-1].strip()
-            else:
-                final_diary = generated_text
+            # 5. 후처리 (한자 및 잡음 제거)
+            final_diary = re.sub(r'[\u4e00-\u9fff]+', '', generated_text)
+            final_diary = final_diary.replace("()", "").strip()
 
-            # 혹시 영어가 섞여 나올 경우를 대비한 안전장치 (선택 사항)
+            # 혹시 모를 태그 제거 ([|assistant|] 등)
+            final_diary = final_diary.replace("[|assistant|]", "").strip()
+
             return final_diary
 
         except Exception as e:
             print(f"❌ Diary Generation Error: {e}")
-            return f"오늘은 {emotion}을(를) 느낀 하루였다. \"{transcript}\" 라는 일이 있었기 때문이다."
+            return transcript
 
     def generate_title(self, diary_content: str) -> str:
-        # 제목 생성 로직 (첫 줄 사용)
-        first_line = diary_content.split("\n")[0]
-        return first_line[:20] + "..." if len(first_line) > 20 else first_line
+        lines = diary_content.split("\n")
+        if not lines: return "오늘의 기록"
+
+        title = lines[0].replace(".", "").strip()
+        title = re.sub(r'[\u4e00-\u9fff]+', '', title)
+        return title[:20] + "..." if len(title) > 20 else title
 
 # 싱글톤 인스턴스
 diary_service = DiaryGenerationService()

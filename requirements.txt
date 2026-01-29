@@ -10,11 +10,16 @@ python-dotenv
 
 # --- AI Services ---
 faster-whisper
+# transformers  <-- (EXAONE GGUF 구동 시엔 필수는 아니지만, 다른 서비스 위해 유지)
 transformers
 torch
 sentencepiece
-accelerate  # [New] LLM 가속
-pydub       # [New] 오디오 포맷 변환 (WebM -> Wav)
+accelerate
+pydub
+
+# [New] LG EXAONE GGUF 구동용
+llama-cpp-python
+huggingface-hub
 
 # --- Frontend & Visualization ---
 streamlit

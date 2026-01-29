@@ -174,7 +174,7 @@ def render_main():
                         progress_bar = st.progress(0, text=progress_text)
 
                         for i in range(100):
-                            time.sleep(0.2) # 빠른 반응을 위해 0.5 -> 0.2로 단축
+                            time.sleep(1) # 사용자가 긴 녹음을 했을 경우를 생각해 100초로 변경
 
                             # 백엔드 상태 조회
                             chk = requests.get(f"{BACKEND_URL}/diaries/{diary_id}", headers=headers)

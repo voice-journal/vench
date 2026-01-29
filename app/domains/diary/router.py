@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, File, UploadFile, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.domains.diary import schemas, service
+from typing import Optional
 
 router = APIRouter()
 
@@ -27,3 +28,15 @@ async def create_diary(
 )
 def get_diary(diary_id: int, db: Session = Depends(get_db)):
     return service.get_diary_by_id(db, diary_id)
+
+@router.get(
+    "/",
+    response_model=schemas.DiaryListResponse,
+    summary="일기 목록 조회"
+)
+def get_diaries(
+        skip: int = 0,
+        limit: int = 10,
+        db: Session = Depends(get_db)
+):
+    return service.get_all_diaries(db, skip, limit)

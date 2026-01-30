@@ -9,10 +9,15 @@ services:
     volumes:
       - .:/app
       - ./data/audio:/app/data/audio
+      # 👇 [New] AI 모델 캐시 저장소 연결 (재다운로드 방지)
+      - ./data/hf_cache:/root/.cache/huggingface
     ports:
       - "8000:8000"
     environment:
       - DATABASE_URL=mysql+pymysql://user:password@db:3306/vench
+      # 👇 [New] 다운로드 타임아웃을 10분(600초)으로 늘림
+      - HF_HUB_DOWNLOAD_TIMEOUT=600
+      - HF_TIMEOUT=600
     depends_on:
       - db
     labels:
@@ -78,10 +83,11 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+    # Grafana 설정 파일 연결
     volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
       - ./vench_plg_dashboard.json:/var/lib/grafana/dashboards/vench_plg_dashboard.json
-      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
     depends_on:
       - prometheus
       - loki

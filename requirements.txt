@@ -25,6 +25,10 @@ pydub
 llama-cpp-python
 huggingface-hub
 
+# --- Text Analysis (Rule/Morph) ---
+kiwipiepy
+regex
+
 # --- Frontend & Visualization ---
 streamlit
 requests

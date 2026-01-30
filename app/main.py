@@ -11,6 +11,7 @@ from app.api.api import api_router
 from app.core.database import Base, engine
 from app.core.exceptions import BusinessException
 from app.core.config import settings
+from app.core.init_data import init_data
 
 from app.domains.auth import models as auth_models
 from app.domains.diary import models as diary_models
@@ -36,17 +37,17 @@ logger = logging.getLogger("Vench")
 # ==========================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # [Start] 서버 시작 시 실행
-    
     # 1. 설정 로그 출력
     logger.info("🚀 Vench Backend Server is starting up...")
 
     # 2. DB 테이블 생성
     Base.metadata.create_all(bind=engine)
+
+    # 3. 초기 데이터 주입
+    init_data()
     
     yield # 앱 실행 중
     
-    # [Shutdown] 서버 종료 시 실행
     logger.info("👋 Vench Backend Server is shutting down...")
 
 # ==========================================

@@ -15,7 +15,8 @@ try:
     from app.core.config import settings
     from app.views.auth_view import main as render_auth
     from app.views.main_view import render_main
-    from app.views.admin_view import main as render_admin
+    from app.views.admin_view import render_admin
+
 except ImportError as e:
     st.error(f"모듈 임포트 실패: {e}")
     st.stop()
@@ -50,12 +51,12 @@ def main():
                 st.markdown("### 🛠️ 관리 센터")
                 app_mode = st.selectbox("메뉴 선택", ["🎤  Vench", "🛡️ Admin Dashboard"])
                 st.divider()
-            
+
             if app_mode == "🛡️ Admin Dashboard":
                 render_admin()
             else:
                 render_main()
-        
+
         # 일반 사용자일 경우 바로 메인 렌더링
         else:
             render_main()

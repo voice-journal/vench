@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-def render_admin():
+def main():
     BACKEND_URL = st.session_state["BACKEND_URL"]
     headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
 

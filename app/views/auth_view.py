@@ -1,5 +1,3 @@
-import sys
-import os
 import streamlit as st
 import requests
 import time
@@ -128,8 +126,9 @@ def login_logic(email, password):
             data = res.json()
             st.session_state["access_token"] = data["access_token"]
             st.session_state["user_email"] = email
-            # 성공 시 닉네임 정보가 있다면 세션에 저장 (기존 frontend.py와 호환)
             st.session_state["nickname"] = data.get("nickname", email.split('@')[0])
+            st.session_state["user_role"] = data.get("role", "USER")
+            
             st.success("가로등 불빛이 밝아집니다. 환영합니다. ✨")
             time.sleep(1)
             st.rerun()

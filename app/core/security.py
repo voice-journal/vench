@@ -8,10 +8,10 @@ from app.core.config import settings
 # 비밀번호 해싱 설정 (bcrypt 사용)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def create_access_token(subject: Union[str, Any]) -> str:
+def create_access_token(subject: Union[str, Any], role: str = "USER") -> str:
     """JWT 액세스 토큰 생성"""
     expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode = {"exp": expire, "sub": str(subject)}
+    to_encode = {"exp": expire, "sub": str(subject), "role": role}
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm="HS256")
     return encoded_jwt
 

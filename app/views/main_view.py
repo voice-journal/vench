@@ -5,7 +5,12 @@ import altair as alt
 import time
 import random
 import json
-from datetime import datetime
+
+from app.views.admin_view import render_admin
+from app.domains.feedback.models import FeedbackCategory
+
+# ✅ set_page_config는 파일당 1번, 최상단에서만
+st.set_page_config(page_title="Vench", page_icon="🛋️", layout="wide")
 
 # --- [1] 감정별 테마 및 위로 메시지 풀(Pool) 설정 (8종) ---
 EMOTION_THEMES = {
@@ -112,6 +117,18 @@ def render_styled_chart(df, color, is_probability=False):
     )
     st.altair_chart(chart, use_container_width=True)
 
+
+def _post_feedback(BACKEND_URL: str, payload: dict, headers: dict):
+    """
+    ✅ 백엔드 라우팅이 /feedbacks vs /feedbacks/feedbacks 로 꼬인 상태라
+    둘 다 시도하는 우회 로직
+    """
+    res = requests.post(f"{BACKEND_URL}/feedbacks", json=payload, headers=headers)
+    if res.status_code == 404:
+        res = requests.post(f"{BACKEND_URL}/feedbacks/feedbacks", json=payload, headers=headers)
+    return res
+
+
 def render_feedback(diary, headers):
     """피드백 모달 및 전송 로직"""
     if diary.get("status") != "COMPLETED": return
@@ -123,6 +140,33 @@ def render_feedback(diary, headers):
     @st.dialog("사용자 피드백")
     def fb_dialog():
         st.write("분석 결과가 도움이 되었나요? 별점과 의견을 남겨주세요 🙏")
+
+        # ✅ 화면 표시용(한글) 라벨 매핑
+        category_label_map = {
+            FeedbackCategory.STT_ACCURACY.value: "STT 정확도",
+            FeedbackCategory.PERFORMANCE.value: "속도/성능",
+            FeedbackCategory.UX_UI.value: "UX/UI",
+            FeedbackCategory.BUG.value: "버그",
+            FeedbackCategory.FEATURE_REQUEST.value: "기능 요청",
+            FeedbackCategory.OTHER.value: "기타",
+        }
+
+        # ✅ selectbox 옵션: (표시 라벨, 실제 전송 값)
+        category_options = [("선택 안 함", None)] + [
+            (category_label_map.get(c.value, c.value), c.value) for c in FeedbackCategory
+        ]
+
+        selected_label = st.selectbox(
+            "카테고리(선택)",
+            options=[label for label, _ in category_options],
+            index=0,
+            key=f"category_{diary_id}",
+        )
+
+        # 선택된 label -> 실제 enum value(None or "STT_ACCURACY" ...)
+        label_to_value = {label: value for label, value in category_options}
+        selected_value = label_to_value[selected_label]
+
         rating = st.slider("별점", 1, 5, 5, key=f"rating_{diary_id}")
         comment = st.text_area("상세 피드백", key=f"comment_{diary_id}")
 
@@ -130,13 +174,16 @@ def render_feedback(diary, headers):
             payload = {
                 "diary_id": diary_id,
                 "rating": rating,
-                "comment": comment.strip() or None
+                "comment": comment.strip() or None,
+                "user_category": selected_value,  # ✅ None 또는 enum value 문자열
             }
+
             try:
-                res = requests.post(f"{BACKEND_URL}/feedbacks/", json=payload, headers=headers)
-                if res.status_code in [200, 201]:
+                res = _post_feedback(BACKEND_URL, payload, headers)
+
+                if res.status_code in (200, 201):
                     st.success("소중한 의견 감사합니다! 🙇")
-                    time.sleep(1)
+                    time.sleep(0.8)
                     st.session_state[open_key] = False
                     st.rerun()
                 else:
@@ -144,7 +191,8 @@ def render_feedback(diary, headers):
             except Exception as e:
                 st.error(f"서버 연결 오류: {e}")
 
-    if st.button("📝 사용자 피드백 남기기", key=f"btn_fb_{diary_id}"):
+    # ✅ (요청) 분석 완료 후에만 노출되는 버튼
+    if st.button("📝 사용자 피드백 작성하기", key=f"btn_fb_{diary_id}"):
         st.session_state[open_key] = True
 
     if st.session_state.get(open_key, False):
@@ -158,7 +206,8 @@ def render_main():
         st.session_state["last_diary"] = None
 
     # --- [상단바] ---
-    c1, c2 = st.columns([8, 2])
+    c1, c2 = st.columns([7, 2])
+
     with c1:
         st.title("🛋️ Vench")
         st.subheader("잠시 쉬어가세요, 당신의 하루를 들어줄게요.")
@@ -168,6 +217,7 @@ def render_main():
         if st.button("로그아웃"):
             st.session_state["access_token"] = None
             st.rerun()
+
     st.markdown("---")
 
     # --- [사이드바] 감정 리포트 ---

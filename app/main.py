@@ -1,5 +1,6 @@
 import logging
 import logging.config
+import asyncio # [New] 비동기 루프용
 
 from fastapi import FastAPI
 from fastapi import Request
@@ -8,29 +9,43 @@ from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.api.api import api_router
-from app.core.database import Base, engine
+from app.core.database import Base, engine, SessionLocal # [New] SessionLocal 추가
 from app.core.exceptions import BusinessException
 from app.core.config import settings
 from app.core.init_data import init_data
+
+# [New] 모니터링 서비스 임포트
+from app.services.monitoring_service import update_business_metrics
 
 from app.domains.auth import models as auth_models
 from app.domains.diary import models as diary_models
 from app.domains.feedback import models as feedback_models
 
 # ==========================================
-# 1. 로깅 설정 로드 (Logging Setup)
+# 1. 로깅 설정 로드
 # ==========================================
 try:
-    # app/core/logging.py가 있으면 해당 설정을 따름
     from app.core.logging import LOGGING_CONFIG
     logging.config.dictConfig(LOGGING_CONFIG)
 except ImportError:
-    # 설정 파일이 없으면 기본 설정 사용
     logging.basicConfig(level=logging.INFO)
 
-# "Vench" 로거를 가져와야 설정(logging.py)이 적용된 포맷으로 출력됩니다.
 logger = logging.getLogger("Vench")
 
+# ==========================================
+# [New] 백그라운드 메트릭 업데이트 태스크
+# ==========================================
+async def periodic_metrics_update():
+    """15초마다 비즈니스 지표를 DB에서 조회하여 갱신"""
+    while True:
+        try:
+            # 별도의 DB 세션을 열어서 사용
+            with SessionLocal() as db:
+                update_business_metrics(db)
+        except Exception as e:
+            logger.error(f"Metric update loop error: {e}")
+
+        await asyncio.sleep(15) # 15초 대기
 
 # ==========================================
 # 2. Lifespan (앱 수명 주기 관리)
@@ -38,9 +53,8 @@ logger = logging.getLogger("Vench")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 1. 설정 로그 출력
+    # [Start] 서버 시작 시 실행
     logger.info("🚀 Vench Backend Server is starting up...")
-
-    # 2. DB 테이블 생성
     Base.metadata.create_all(bind=engine)
 
     # 3. 초기 데이터 주입
@@ -48,31 +62,34 @@ async def lifespan(app: FastAPI):
     
     yield # 앱 실행 중
     
+    # [New] 메트릭 업데이트 백그라운드 태스크 시작
+    metrics_task = asyncio.create_task(periodic_metrics_update())
+
+    yield # 앱 실행 중
+
+    # [Shutdown] 서버 종료 시 실행
+    # 태스크 취소
+    metrics_task.cancel()
     logger.info("👋 Vench Backend Server is shutting down...")
 
 # ==========================================
 # 3. 애플리케이션 초기화
 # ==========================================
-# DB 테이블 자동 생성 (실무에서는 Alembic 마이그레이션 권장)
-# Base.metadata.create_all(bind=engine)
-
 app = FastAPI(title="Vench API", lifespan=lifespan)
 
 # Prometheus 모니터링 엔드포인트 노출 (/metrics)
 Instrumentator().instrument(app).expose(app)
 
 # ==========================================
-# 4. 전역 예외 핸들러 (Global Exception Handler)
+# 4. 전역 예외 핸들러
 # ==========================================
 @app.exception_handler(BusinessException)
-async def business_exception_handler(request: Request, exc: BusinessException):    
+async def business_exception_handler(request: Request, exc: BusinessException):
     if exc.log_message:
-        # 개발자가 디버깅을 위해 남긴 상세 메시지 기록
         logger.error(f"[BusinessError] {exc.code} - {exc.log_message}")
     else:
         logger.warning(f"[BusinessError] {exc.code} - {exc.message}")
-    
-    # 클라이언트(프론트엔드)에게는 약속된 JSON 포맷만 전달
+
     return JSONResponse(
         status_code=exc.status_code,
         content={

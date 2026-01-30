@@ -12,6 +12,7 @@ from app.api.api import api_router
 from app.core.database import Base, engine, SessionLocal # [New] SessionLocal 추가
 from app.core.exceptions import BusinessException
 from app.core.config import settings
+from app.core.init_data import init_data
 
 # [New] 모니터링 서비스 임포트
 from app.services.monitoring_service import update_business_metrics
@@ -51,10 +52,16 @@ async def periodic_metrics_update():
 # ==========================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 1. 설정 로그 출력
     # [Start] 서버 시작 시 실행
     logger.info("🚀 Vench Backend Server is starting up...")
     Base.metadata.create_all(bind=engine)
 
+    # 3. 초기 데이터 주입
+    init_data()
+    
+    yield # 앱 실행 중
+    
     # [New] 메트릭 업데이트 백그라운드 태스크 시작
     metrics_task = asyncio.create_task(periodic_metrics_update())
 

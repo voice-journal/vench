@@ -1,5 +1,5 @@
-# app/domains/auth/schemas.py (신규 생성)
 from pydantic import BaseModel, EmailStr
+from app.domains.auth.models import UserRole
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -14,3 +14,4 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     nickname: str | None = None
+    role: UserRole

@@ -1,22 +1,21 @@
 import logging
 import logging.config
-import asyncio # [New] 비동기 루프용
+import asyncio
+from contextlib import asynccontextmanager # [수정] 누락된 임포트 추가 및 정리
 
 from fastapi import FastAPI
 from fastapi import Request
-from fastapi.concurrency import asynccontextmanager
+# from fastapi.concurrency import asynccontextmanager # [삭제] 표준 라이브러리 사용 권장
 from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.api.api import api_router
-from app.core.database import Base, engine, SessionLocal # [New] SessionLocal 추가
+from app.core.database import Base, engine, SessionLocal
 from app.core.exceptions import BusinessException
 from app.core.config import settings
 from app.core.init_data import init_data
 
-# [New] 모니터링 서비스 임포트
 from app.services.monitoring_service import update_business_metrics
-
 from app.domains.auth import models as auth_models
 from app.domains.diary import models as diary_models
 from app.domains.feedback import models as feedback_models
@@ -33,43 +32,47 @@ except ImportError:
 logger = logging.getLogger("Vench")
 
 # ==========================================
-# [New] 백그라운드 메트릭 업데이트 태스크
+# 백그라운드 메트릭 업데이트 태스크
 # ==========================================
 async def periodic_metrics_update():
     """15초마다 비즈니스 지표를 DB에서 조회하여 갱신"""
     while True:
         try:
-            # 별도의 DB 세션을 열어서 사용
             with SessionLocal() as db:
                 update_business_metrics(db)
+            # logger.info("✅ Metrics Updated") # 디버깅용 (필요시 주석 해제)
         except Exception as e:
             logger.error(f"Metric update loop error: {e}")
 
-        await asyncio.sleep(15) # 15초 대기
+        await asyncio.sleep(15)
 
 # ==========================================
 # 2. Lifespan (앱 수명 주기 관리)
 # ==========================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. 설정 로그 출력
     # [Start] 서버 시작 시 실행
     logger.info("🚀 Vench Backend Server is starting up...")
+
+    # 1. DB 테이블 생성 (테이블이 없을 때만 생성됨)
     Base.metadata.create_all(bind=engine)
 
-    # 3. 초기 데이터 주입
+    # 2. 초기 데이터 주입
     init_data()
-    
-    yield # 앱 실행 중
-    
-    # [New] 메트릭 업데이트 백그라운드 태스크 시작
-    metrics_task = asyncio.create_task(periodic_metrics_update())
 
-    yield # 앱 실행 중
+    # 3. [Fix] 메트릭 업데이트 태스크 시작 (yield 이전에 실행해야 함!)
+    metrics_task = asyncio.create_task(periodic_metrics_update())
+    logger.info("📈 Background metrics task started.")
+
+    yield # 🟢 앱 실행 중 (여기서 대기)
 
     # [Shutdown] 서버 종료 시 실행
-    # 태스크 취소
     metrics_task.cancel()
+    try:
+        await metrics_task
+    except asyncio.CancelledError:
+        pass
+
     logger.info("👋 Vench Backend Server is shutting down...")
 
 # ==========================================
